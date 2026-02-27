@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Snake Fun</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="menu-screen" class="screen active">
+            <h1>🐍 Snake Fun</h1>
+            <div class="menu-buttons">
+                <button id="play-btn" class="btn-primary">Play</button>
+                <button id="shop-btn" class="btn-secondary">Shop</button>
+                <button id="merge-btn" class="btn-secondary">Merge Snakes</button>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">Coins:</span>
+                    <span id="coins-display">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Snakes:</span>
+                    <span id="snakes-count">1</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-screen" class="screen">
+            <div id="game-hud">
+                <div class="hud-left">
+                    <div class="hud-item">Level: <span id="player-level">1</span></div>
+                    <div class="hud-item">Length: <span id="player-length">10</span></div>
+                    <div class="hud-item">Coins: <span id="game-coins">0</span></div>
+                </div>
+                <button id="explore-btn" class="btn-explore">🌍 Explore</button>
+                <button id="menu-btn" class="btn-menu">Menu</button>
+            </div>
+            <canvas id="game-canvas"></canvas>
+            <div id="joystick-container">
+                <div id="joystick">
+                    <div id="joystick-stick"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="shop-screen" class="screen">
+            <div class="shop-header">
+                <h2>Skin Shop</h2>
+                <button id="shop-close-btn" class="btn-close">×</button>
+            </div>
+            <div class="shop-coins">
+                Coins: <span id="shop-coins-display">0</span>
+            </div>
+            <div id="shop-items" class="shop-grid"></div>
+        </div>
+
+        <div id="merge-screen" class="screen">
+            <div class="merge-header">
+                <h2>Merge Snakes</h2>
+                <button id="merge-close-btn" class="btn-close">×</button>
+            </div>
+            <div class="merge-info">
+                Merge two snakes of the same level to create a stronger snake!
+            </div>
+            <div id="merge-slots" class="merge-container"></div>
+            <button id="merge-confirm-btn" class="btn-primary" disabled>Merge</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
