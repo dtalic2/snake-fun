@@ -238,7 +238,7 @@ function spawnInitialEntities() {
 
     // Spawn other snakes (bots) - always spawn some
     otherSnakes = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
         spawnBotSnake();
     }
 }
@@ -531,7 +531,7 @@ function update(dt) {
     while (coins.length < 50) spawnCoin();
 
     // Maintain snake population
-    const targetSnakeCount = gameState.multiplayerMode ? 80 : 40;
+    const targetSnakeCount = gameState.multiplayerMode ? 150 : 80;
     while (otherSnakes.length < targetSnakeCount) {
         spawnBotSnake();
     }
@@ -953,15 +953,32 @@ function drawSnake(snake, isPlayer) {
         ctx.stroke(path);
         ctx.restore();
 
-        // Tail taper: draw smaller circles near the end to taper
-        const taperCount = Math.min(5, snake.segments.length - 1);
+        // Belly stripe: lighter ventral underside (realistic snake belly)
+        ctx.save();
+        ctx.translate(0, bodyWidth * 0.18);
+        ctx.lineWidth = bodyWidth * 0.38;
+        ctx.strokeStyle = 'rgba(255, 245, 210, 0.22)';
+        ctx.stroke(path);
+        ctx.restore();
+
+        // Tail taper: gradually narrow to a pointed tip
+        const taperCount = Math.min(Math.floor(snake.segments.length * 0.25) + 3, 22);
         for (let i = 0; i < taperCount; i++) {
             const seg = snake.segments[snake.segments.length - 1 - i];
-            const t = (taperCount - i) / taperCount;
-            const r = (bodyWidth / 2) * t;
+            const t = i / Math.max(1, taperCount - 1); // 0 at tip, 1 at body junction
+            const r = (bodyWidth / 2) * Math.pow(t, 0.55);
+            if (r < 0.5) continue;
             ctx.beginPath();
-            ctx.arc(seg.x, seg.y, bodyWidth / 2 - r * 0.3, 0, Math.PI * 2);
+            ctx.arc(seg.x, seg.y, r + 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = secondColor;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
             ctx.fillStyle = baseColor;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(seg.x - r * 0.1, seg.y - r * 0.25, r * 0.4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
             ctx.fill();
         }
 
@@ -988,13 +1005,26 @@ function drawSnake(snake, isPlayer) {
     ctx.translate(head.x, head.y);
     ctx.rotate(angle);
 
-    const headLength = head.radius * 1.6;
-    const headWidth = head.radius * 1.1;
+    const headLength = head.radius * 1.55;
+    const headWidth = head.radius * 1.15;
+
+    // Helper: trace a pointed/triangular snake head shape (snout toward +X)
+    const traceHead = (dx, dy) => {
+        const hl = headLength, hw = headWidth;
+        ctx.beginPath();
+        ctx.moveTo(dx + hl, dy); // snout tip
+        // Upper jaw: curves wide then back
+        ctx.bezierCurveTo(dx + hl * 0.3, dy - hw * 1.05, dx - hl * 0.2, dy - hw * 1.15, dx - hl * 0.5, dy - hw * 0.88);
+        // Back of head (rounded)
+        ctx.bezierCurveTo(dx - hl * 0.72, dy - hw * 0.32, dx - hl * 0.72, dy + hw * 0.32, dx - hl * 0.5, dy + hw * 0.88);
+        // Lower jaw: back to snout
+        ctx.bezierCurveTo(dx - hl * 0.2, dy + hw * 1.15, dx + hl * 0.3, dy + hw * 1.05, dx + hl, dy);
+        ctx.closePath();
+    };
 
     // Head shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-    ctx.beginPath();
-    ctx.ellipse(3, 3, headLength, headWidth, 0, 0, Math.PI * 2);
+    traceHead(3, 3);
     ctx.fill();
 
     // Head body with gradient
@@ -1004,8 +1034,7 @@ function drawSnake(snake, isPlayer) {
     headGradient.addColorStop(0.7, baseColor);
     headGradient.addColorStop(1, secondColor);
     ctx.fillStyle = headGradient;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    traceHead(0, 0);
     ctx.fill();
 
     // Head highlight
@@ -1014,21 +1043,19 @@ function drawSnake(snake, isPlayer) {
     headHighlight.addColorStop(0.4, 'rgba(255, 255, 255, 0.2)');
     headHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = headHighlight;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    traceHead(0, 0);
     ctx.fill();
 
     // Head outline
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    traceHead(0, 0);
     ctx.stroke();
 
-    // Eyes - larger and rounder (Snake Clash style)
-    const eyeOffsetX = headLength * 0.35;
-    const eyeOffsetY = headWidth * 0.4;
-    const eyeRadius = 4.5;
+    // Eyes - positioned on the sides of the triangular head
+    const eyeOffsetX = headLength * 0.12;
+    const eyeOffsetY = headWidth * 0.72;
+    const eyeRadius = 4.0;
 
     // Left eye white
     ctx.fillStyle = 'white';
@@ -1039,16 +1066,16 @@ function drawSnake(snake, isPlayer) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Left pupil (round, not slit)
-    ctx.fillStyle = 'black';
+    // Left pupil - vertical slit (realistic snake eye)
+    ctx.fillStyle = '#111';
     ctx.beginPath();
-    ctx.arc(eyeOffsetX + 1.5, -eyeOffsetY, 2.5, 0, Math.PI * 2);
+    ctx.ellipse(eyeOffsetX + 0.8, -eyeOffsetY, 1.3, 2.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Left eye glint
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(eyeOffsetX + 2.5, -eyeOffsetY - 1.5, 1, 0, Math.PI * 2);
+    ctx.arc(eyeOffsetX + 2.0, -eyeOffsetY - 1.5, 0.9, 0, Math.PI * 2);
     ctx.fill();
 
     // Right eye white
@@ -1060,16 +1087,25 @@ function drawSnake(snake, isPlayer) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Right pupil
-    ctx.fillStyle = 'black';
+    // Right pupil - vertical slit
+    ctx.fillStyle = '#111';
     ctx.beginPath();
-    ctx.arc(eyeOffsetX + 1.5, eyeOffsetY, 2.5, 0, Math.PI * 2);
+    ctx.ellipse(eyeOffsetX + 0.8, eyeOffsetY, 1.3, 2.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Right eye glint
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(eyeOffsetX + 2.5, eyeOffsetY - 1.5, 1, 0, Math.PI * 2);
+    ctx.arc(eyeOffsetX + 2.0, eyeOffsetY - 1.5, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nostrils - small pits near the snout tip
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.beginPath();
+    ctx.ellipse(headLength * 0.72, -headWidth * 0.3, 1.5, 1.0, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(headLength * 0.72, headWidth * 0.3, 1.5, 1.0, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
     // Forked tongue
