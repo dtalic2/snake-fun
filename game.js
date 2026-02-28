@@ -206,15 +206,14 @@ function initializePlayer() {
     // Set level first
     player.level = gameState.playerSnakes[gameState.currentSnakeIndex].level;
 
-    // Calculate base radius based on level
-    const baseRadius = 8 + (player.level - 1) * 0.5;
+    const baseRadius = 8;
 
     player.segments = [];
     for (let i = 0; i < player.length; i++) {
         player.segments.push({
             x: startX - i * 10,
             y: startY,
-            radius: baseRadius + i * 0.2
+            radius: baseRadius
         });
     }
     // Initialize with angle pointing right
@@ -275,7 +274,7 @@ function spawnBotSnake() {
         segments.push({
             x: startX - i * 10,
             y: startY,
-            radius: 7 + i * 0.15 // Slightly varied radius growth
+            radius: 8
         });
     }
 
@@ -700,12 +699,6 @@ function checkCollisions() {
             // Level up with EVERY pellet and increase size
             player.level++;
 
-            // Increase all segment radii when leveling up
-            const radiusIncrease = 0.5;
-            player.segments.forEach(segment => {
-                segment.radius += radiusIncrease;
-            });
-
             updateUI();
         }
     }
@@ -750,12 +743,6 @@ function checkCollisions() {
                 // Gain levels based on eaten snake's level
                 if (levelGain > 0) {
                     player.level += levelGain;
-
-                    // Increase size when gaining levels
-                    const radiusIncrease = levelGain * 0.5;
-                    player.segments.forEach(segment => {
-                        segment.radius += radiusIncrease;
-                    });
                 }
 
                 updateUI();
