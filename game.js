@@ -522,6 +522,7 @@ function update(dt) {
     updatePlayer(dt);
     updateOtherSnakes(dt);
     updateCoins(dt);
+    updatePellets(dt);
     updateCamera();
     checkCollisions();
 
@@ -670,6 +671,26 @@ function updateCoins(dt) {
     });
 }
 
+function updatePellets(dt) {
+    if (player.segments.length === 0) return;
+    const head = player.segments[0];
+    const MAGNETIC_RADIUS = 150;
+    const MAGNETIC_SPEED = 4;
+
+    pellets.forEach(pellet => {
+        const dx = head.x - pellet.x;
+        const dy = head.y - pellet.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < MAGNETIC_RADIUS && distance > 0) {
+            // Pull strength increases as pellet gets closer
+            const strength = (1 - distance / MAGNETIC_RADIUS) * MAGNETIC_SPEED;
+            pellet.x += (dx / distance) * strength;
+            pellet.y += (dy / distance) * strength;
+        }
+    });
+}
+
 function updateCamera() {
     if (player.segments.length > 0) {
         const head = player.segments[0];
@@ -728,12 +749,20 @@ function checkCollisions() {
         const otherSnake = otherSnakes[i];
         if (otherSnake.segments.length === 0) continue;
 
-        const otherHead = otherSnake.segments[0];
-        const dx = head.x - otherHead.x;
-        const dy = head.y - otherHead.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Check collision against every segment of the other snake
+        let hit = false;
+        for (let j = 0; j < otherSnake.segments.length; j++) {
+            const seg = otherSnake.segments[j];
+            const dx = head.x - seg.x;
+            const dy = head.y - seg.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < head.radius + seg.radius) {
+                hit = true;
+                break;
+            }
+        }
 
-        if (distance < head.radius + otherHead.radius) {
+        if (hit) {
             // Can only eat snakes of lower level
             if (player.level > otherSnake.level) {
                 otherSnakes.splice(i, 1);
