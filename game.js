@@ -11,18 +11,31 @@ const gameState = {
 
 // Skins available in shop
 const skins = [
-    { id: 'default', name: 'Classic Green', color: '#27ae60', pattern: 'scales', price: 0 },
-    { id: 'viper', name: 'Viper', color: '#2c3e50', pattern: 'diamond', price: 100 },
-    { id: 'coral', name: 'Coral Snake', color: '#e74c3c', pattern: 'bands', price: 100 },
-    { id: 'python', name: 'Python', color: '#8b6914', pattern: 'spots', price: 150 },
-    { id: 'ocean', name: 'Ocean Blue', color: '#3498db', pattern: 'gradient', price: 150 },
-    { id: 'emerald', name: 'Emerald', color: '#16a085', pattern: 'scales', price: 200 },
-    { id: 'tiger', name: 'Tiger Snake', color: '#f39c12', pattern: 'stripes', price: 250 },
-    { id: 'albino', name: 'Albino', color: '#ecf0f1', pattern: 'scales', price: 300 },
-    { id: 'venom', name: 'Venom', color: '#8e44ad', pattern: 'hex', price: 350 },
-    { id: 'lava', name: 'Lava', color: '#c0392b', pattern: 'cracks', price: 400 },
-    { id: 'galaxy', name: 'Galaxy', color: '#2c3e50', pattern: 'stars', price: 500 },
-    { id: 'rainbow', name: 'Rainbow', color: 'rainbow', pattern: 'rainbow', price: 600 }
+    { id: 'default', name: 'Classic Green', color: '#27ae60', secondColor: '#1e8449', pattern: 'scales', price: 0 },
+    { id: 'viper', name: 'Viper', color: '#2c3e50', secondColor: '#1a252f', pattern: 'diamond', price: 100 },
+    { id: 'coral', name: 'Coral Snake', color: '#e74c3c', secondColor: '#c0392b', pattern: 'bands', price: 100 },
+    { id: 'python', name: 'Python', color: '#8b6914', secondColor: '#654321', pattern: 'spots', price: 150 },
+    { id: 'ocean', name: 'Ocean Blue', color: '#3498db', secondColor: '#2980b9', pattern: 'gradient', price: 150 },
+    { id: 'emerald', name: 'Emerald', color: '#16a085', secondColor: '#138d75', pattern: 'scales', price: 200 },
+    { id: 'tiger', name: 'Tiger Snake', color: '#f39c12', secondColor: '#d68910', pattern: 'stripes', price: 250 },
+    { id: 'albino', name: 'Albino', color: '#ecf0f1', secondColor: '#d5dbdb', pattern: 'scales', price: 300 },
+    { id: 'venom', name: 'Venom', color: '#8e44ad', secondColor: '#6c3483', pattern: 'hex', price: 350 },
+    { id: 'lava', name: 'Lava', color: '#c0392b', secondColor: '#943126', pattern: 'cracks', price: 400 },
+    { id: 'galaxy', name: 'Galaxy', color: '#2c3e50', secondColor: '#1c2833', pattern: 'stars', price: 500 },
+    { id: 'rainbow', name: 'Rainbow', color: 'rainbow', secondColor: 'rainbow', pattern: 'rainbow', price: 600 },
+    { id: 'blackmamba', name: 'Black Mamba', color: '#1a1a1a', secondColor: '#0a0a0a', pattern: 'smooth', price: 700 },
+    { id: 'kingcobra', name: 'King Cobra', color: '#d4af37', secondColor: '#b8941e', pattern: 'cobra', price: 750 },
+    { id: 'rattlesnake', name: 'Rattlesnake', color: '#8b7355', secondColor: '#6b5638', pattern: 'rattle', price: 800 },
+    { id: 'anaconda', name: 'Anaconda', color: '#4a5d23', secondColor: '#3a4a1a', pattern: 'anaconda', price: 850 },
+    { id: 'copperhead', name: 'Copperhead', color: '#b87333', secondColor: '#9b5c28', pattern: 'copper', price: 900 },
+    { id: 'neon', name: 'Neon Glow', color: '#00ff00', secondColor: '#00cc00', pattern: 'glow', price: 950 },
+    { id: 'toxic', name: 'Toxic Waste', color: '#39ff14', secondColor: '#2ecc11', pattern: 'toxic', price: 1000 },
+    { id: 'ice', name: 'Ice Dragon', color: '#a0d8f1', secondColor: '#7fb3d5', pattern: 'ice', price: 1100 },
+    { id: 'fire', name: 'Fire Drake', color: '#ff4500', secondColor: '#ff6347', pattern: 'flames', price: 1100 },
+    { id: 'electric', name: 'Electric Eel', color: '#ffff00', secondColor: '#ffd700', pattern: 'lightning', price: 1200 },
+    { id: 'shadow', name: 'Shadow Serpent', color: '#2f2f2f', secondColor: '#1f1f1f', pattern: 'shadow', price: 1300 },
+    { id: 'crystal', name: 'Crystal Snake', color: '#e8f4f8', secondColor: '#b8d4e0', pattern: 'crystal', price: 1400 },
+    { id: 'magma', name: 'Magma Core', color: '#ff4000', secondColor: '#cc3300', pattern: 'magma', price: 1500 }
 ];
 
 // Game Canvas
@@ -780,7 +793,7 @@ function drawGrid() {
 function drawSnake(snake, isPlayer) {
     const skin = skins.find(s => s.id === snake.skin) || skins[0];
 
-    // Draw body with patterns
+    // Draw body with elongated segments (more realistic)
     for (let i = snake.segments.length - 1; i >= 0; i--) {
         const segment = snake.segments[i];
         const screenX = segment.x - camera.x;
@@ -789,147 +802,231 @@ function drawSnake(snake, isPlayer) {
         if (screenX > -50 && screenX < gameWidth + 50 && screenY > -50 && screenY < gameHeight + 50) {
             // Get base color
             let baseColor = skin.color;
+            let secondColor = skin.secondColor || skin.color;
             if (skin.color === 'rainbow') {
                 const hue = (i * 30) % 360;
                 baseColor = `hsl(${hue}, 70%, 50%)`;
+                secondColor = `hsl(${(hue + 30) % 360}, 70%, 45%)`;
             }
 
-            // Draw main body
-            ctx.fillStyle = baseColor;
+            // Calculate segment angle for elongation
+            let segmentAngle = 0;
+            if (i > 0) {
+                const prev = snake.segments[i - 1];
+                segmentAngle = Math.atan2(prev.y - segment.y, prev.x - segment.x);
+            } else if (snake.angle !== undefined) {
+                segmentAngle = snake.angle;
+            }
+
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(segmentAngle);
+
+            // Draw elongated body segment
+            const radiusX = segment.radius * 1.4; // Elongated
+            const radiusY = segment.radius;
+
+            // Shadow/depth layer
+            const shadowGradient = ctx.createRadialGradient(0, radiusY * 0.3, 0, 0, 0, radiusY * 1.2);
+            shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+            ctx.fillStyle = shadowGradient;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw pattern overlay
-            drawSnakePattern(skin.pattern, screenX, screenY, segment.radius, baseColor, i);
-
-            // Draw belly (lighter underside)
-            const bellyGradient = ctx.createRadialGradient(screenX, screenY + 2, 0, screenX, screenY, segment.radius);
-            bellyGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-            bellyGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.1)');
-            bellyGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = bellyGradient;
+            // Main body gradient (3D effect)
+            const bodyGradient = ctx.createLinearGradient(0, -radiusY, 0, radiusY);
+            bodyGradient.addColorStop(0, secondColor);
+            bodyGradient.addColorStop(0.3, baseColor);
+            bodyGradient.addColorStop(0.7, baseColor);
+            bodyGradient.addColorStop(1, secondColor);
+            ctx.fillStyle = bodyGradient;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // Top highlight for shininess
+            const highlightGradient = ctx.createRadialGradient(0, -radiusY * 0.4, 0, 0, -radiusY * 0.4, radiusY * 0.8);
+            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            highlightGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+            highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = highlightGradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Draw pattern overlay (back to regular coordinates)
+            drawSnakePattern(skin.pattern, screenX, screenY, segment.radius, baseColor, i, segmentAngle);
 
             // Outline for definition
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.lineWidth = 1.5;
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(segmentAngle);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.restore();
         }
     }
 
-    // Draw head with eyes and details
+    // Draw enhanced realistic head
     if (snake.segments.length > 0) {
         const head = snake.segments[0];
         const screenX = head.x - camera.x;
         const screenY = head.y - camera.y;
 
-        // Draw tongue
-        const angle = Math.atan2(snake.targetY - head.y, snake.targetX - head.x);
-        const tongueLength = 12;
-        const tongueX = screenX + Math.cos(angle) * head.radius;
-        const tongueY = screenY + Math.sin(angle) * head.radius;
+        const angle = snake.angle !== undefined ? snake.angle : Math.atan2(snake.targetY - head.y, snake.targetX - head.x);
 
-        ctx.strokeStyle = '#e74c3c';
-        ctx.lineWidth = 2;
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(angle);
+
+        // Get colors
+        let baseColor = skin.color;
+        let secondColor = skin.secondColor || skin.color;
+        if (skin.color === 'rainbow') {
+            const hue = Date.now() / 50 % 360;
+            baseColor = `hsl(${hue}, 70%, 50%)`;
+            secondColor = `hsl(${(hue + 30) % 360}, 70%, 45%)`;
+        }
+
+        // Draw head shape (slightly larger and more detailed)
+        const headLength = head.radius * 1.8;
+        const headWidth = head.radius * 1.2;
+
+        // Head shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.beginPath();
-        ctx.moveTo(tongueX, tongueY);
-        const forkOffset = 3;
-        ctx.lineTo(tongueX + Math.cos(angle) * tongueLength, tongueY + Math.sin(angle) * tongueLength);
-        ctx.stroke();
+        ctx.ellipse(2, 2, headLength, headWidth, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Fork of tongue
+        // Head gradient
+        const headGradient = ctx.createLinearGradient(0, -headWidth, 0, headWidth);
+        headGradient.addColorStop(0, secondColor);
+        headGradient.addColorStop(0.4, baseColor);
+        headGradient.addColorStop(0.6, baseColor);
+        headGradient.addColorStop(1, secondColor);
+        ctx.fillStyle = headGradient;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Head highlight
+        const headHighlight = ctx.createRadialGradient(0, -headWidth * 0.3, 0, 0, 0, headWidth * 1.5);
+        headHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        headHighlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+        headHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = headHighlight;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Head outline
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.lineWidth = 1.5;
-        const forkAngle1 = angle - 0.3;
-        const forkAngle2 = angle + 0.3;
-        const forkX = tongueX + Math.cos(angle) * tongueLength;
-        const forkY = tongueY + Math.sin(angle) * tongueLength;
-
         ctx.beginPath();
-        ctx.moveTo(forkX, forkY);
-        ctx.lineTo(forkX + Math.cos(forkAngle1) * forkOffset, forkY + Math.sin(forkAngle1) * forkOffset);
+        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.beginPath();
-        ctx.moveTo(forkX, forkY);
-        ctx.lineTo(forkX + Math.cos(forkAngle2) * forkOffset, forkY + Math.sin(forkAngle2) * forkOffset);
-        ctx.stroke();
+        // Eyes (more realistic positioning)
+        const eyeY = -headWidth * 0.3;
+        const eyeX = headLength * 0.4;
 
-        // Eyes with slit pupils (snake-like)
-        const eyeAngle = angle + Math.PI / 2;
-        const eyeDistance = 4;
-        const eye1X = screenX + Math.cos(eyeAngle) * eyeDistance;
-        const eye1Y = screenY + Math.sin(eyeAngle) * eyeDistance;
-        const eye2X = screenX - Math.cos(eyeAngle) * eyeDistance;
-        const eye2Y = screenY - Math.sin(eyeAngle) * eyeDistance;
-
-        // Eye whites
+        // Left eye
         ctx.fillStyle = '#f1c40f';
         ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, 4, 0, Math.PI * 2);
+        ctx.ellipse(-eyeX, eyeY, 3.5, 4.5, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
-        // Slit pupils
+        // Left pupil (slit)
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(eye1X, eye1Y - 3);
-        ctx.lineTo(eye1X, eye1Y + 3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(eye2X, eye2Y - 3);
-        ctx.lineTo(eye2X, eye2Y + 3);
+        ctx.moveTo(-eyeX, eyeY - 3);
+        ctx.lineTo(-eyeX, eyeY + 3);
         ctx.stroke();
 
-        // Eye outline
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        // Right eye
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath();
+        ctx.ellipse(-eyeX, -eyeY, 3.5, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Right pupil (slit)
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-eyeX, -eyeY - 3);
+        ctx.lineTo(-eyeX, -eyeY + 3);
+        ctx.stroke();
+
+        // Forked tongue
+        const tongueLength = 15;
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(headLength - 2, 0);
+        ctx.lineTo(headLength + tongueLength, 0);
+        ctx.stroke();
+
+        // Tongue forks
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, 4, 0, Math.PI * 2);
+        ctx.moveTo(headLength + tongueLength, 0);
+        ctx.lineTo(headLength + tongueLength + 4, -3);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, 4, 0, Math.PI * 2);
+        ctx.moveTo(headLength + tongueLength, 0);
+        ctx.lineTo(headLength + tongueLength + 4, 3);
         ctx.stroke();
+
+        ctx.restore();
 
         // Draw level indicator
         if (isPlayer) {
             ctx.fillStyle = 'white';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
-            ctx.font = 'bold 12px Arial';
+            ctx.font = 'bold 14px Arial';
             ctx.textAlign = 'center';
-            ctx.strokeText(`Lv.${snake.level}`, screenX, screenY - head.radius - 15);
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 15);
+            ctx.strokeText(`Lv.${snake.level}`, screenX, screenY - head.radius - 18);
+            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 18);
         } else {
             ctx.fillStyle = snake.level > player.level ? '#e74c3c' : '#95a5a6';
-            ctx.font = 'bold 10px Arial';
+            ctx.font = 'bold 11px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 12);
+            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 14);
         }
     }
 }
 
-function drawSnakePattern(pattern, x, y, radius, baseColor, segmentIndex) {
+function drawSnakePattern(pattern, x, y, radius, baseColor, segmentIndex, angle = 0) {
     ctx.save();
+    ctx.translate(x, y);
+    if (angle) ctx.rotate(angle);
 
     switch (pattern) {
         case 'scales':
             // Hexagonal scales
             for (let row = -1; row <= 1; row++) {
                 for (let col = -1; col <= 1; col++) {
-                    const scaleX = x + col * 6;
-                    const scaleY = y + row * 6 + (col % 2) * 3;
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-                    ctx.lineWidth = 0.5;
+                    const scaleX = col * 5;
+                    const scaleY = row * 5 + (col % 2) * 2.5;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.lineWidth = 0.8;
                     ctx.beginPath();
-                    ctx.arc(scaleX, scaleY, 3, 0, Math.PI * 2);
+                    ctx.arc(scaleX, scaleY, 2.5, 0, Math.PI * 2);
                     ctx.stroke();
                 }
             }
@@ -1047,6 +1144,193 @@ function drawSnakePattern(pattern, x, y, radius, baseColor, segmentIndex) {
 
         case 'rainbow':
             // Rainbow already handled in main color
+            break;
+
+        case 'smooth':
+            // Smooth, minimal pattern
+            break;
+
+        case 'cobra':
+            // Cobra hood pattern
+            if (segmentIndex % 3 === 0) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.8, 0);
+                ctx.quadraticCurveTo(0, -radius * 0.6, radius * 0.8, 0);
+                ctx.stroke();
+            }
+            break;
+
+        case 'rattle':
+            // Rattlesnake diamond pattern
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(0, -radius * 0.7);
+                ctx.lineTo(radius * 0.5, 0);
+                ctx.lineTo(0, radius * 0.7);
+                ctx.lineTo(-radius * 0.5, 0);
+                ctx.closePath();
+                ctx.fill();
+            }
+            break;
+
+        case 'anaconda':
+            // Large circular spots
+            if (segmentIndex % 3 === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.arc(0, 0, radius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            break;
+
+        case 'copper':
+            // Copper hourglass pattern
+            if (segmentIndex % 4 === 0) {
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.5)';
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.6, -radius * 0.5);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(-radius * 0.6, radius * 0.5);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(radius * 0.6, -radius * 0.5);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(radius * 0.6, radius * 0.5);
+                ctx.fill();
+            }
+            break;
+
+        case 'glow':
+            // Neon glow effect
+            const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+            glowGradient.addColorStop(0, 'rgba(0, 255, 0, 0.4)');
+            glowGradient.addColorStop(0.7, 'rgba(0, 255, 0, 0.1)');
+            glowGradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+        case 'toxic':
+            // Toxic waste drips
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(46, 204, 17, 0.6)';
+                for (let i = 0; i < 3; i++) {
+                    const dripAngle = (i / 3) * Math.PI * 2;
+                    const dripX = Math.cos(dripAngle) * radius * 0.6;
+                    const dripY = Math.sin(dripAngle) * radius * 0.6;
+                    ctx.beginPath();
+                    ctx.arc(dripX, dripY, radius * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            break;
+
+        case 'ice':
+            // Ice crystals
+            if (segmentIndex % 3 === 0) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.lineWidth = 1.5;
+                for (let i = 0; i < 6; i++) {
+                    const crystalAngle = (i / 6) * Math.PI * 2;
+                    const x1 = Math.cos(crystalAngle) * radius * 0.3;
+                    const y1 = Math.sin(crystalAngle) * radius * 0.3;
+                    const x2 = Math.cos(crystalAngle) * radius * 0.7;
+                    const y2 = Math.sin(crystalAngle) * radius * 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+            }
+            break;
+
+        case 'flames':
+            // Fire flames
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+                for (let i = 0; i < 4; i++) {
+                    const flameAngle = (i / 4) * Math.PI * 2;
+                    const flameX = Math.cos(flameAngle) * radius * 0.5;
+                    const flameY = Math.sin(flameAngle) * radius * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(flameX, flameY);
+                    ctx.lineTo(flameX * 1.3, flameY * 1.3);
+                    ctx.lineTo(flameX * 0.7, flameY * 1.3);
+                    ctx.fill();
+                }
+            }
+            break;
+
+        case 'lightning':
+            // Electric bolts
+            if (segmentIndex % 3 === 0) {
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-radius, 0);
+                ctx.lineTo(-radius * 0.3, -radius * 0.4);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(radius * 0.3, radius * 0.4);
+                ctx.lineTo(radius, 0);
+                ctx.stroke();
+            }
+            break;
+
+        case 'shadow':
+            // Shadow wisps
+            if (segmentIndex % 4 === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                for (let i = 0; i < 3; i++) {
+                    const wispAngle = (i / 3) * Math.PI * 2;
+                    const wispX = Math.cos(wispAngle) * radius * 0.8;
+                    const wispY = Math.sin(wispAngle) * radius * 0.8;
+                    ctx.globalAlpha = 0.3;
+                    ctx.beginPath();
+                    ctx.arc(wispX, wispY, radius * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+            }
+            break;
+
+        case 'crystal':
+            // Crystal facets
+            if (segmentIndex % 2 === 0) {
+                ctx.strokeStyle = 'rgba(184, 212, 224, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, -radius * 0.7);
+                ctx.lineTo(radius * 0.5, -radius * 0.3);
+                ctx.lineTo(radius * 0.5, radius * 0.3);
+                ctx.lineTo(0, radius * 0.7);
+                ctx.lineTo(-radius * 0.5, radius * 0.3);
+                ctx.lineTo(-radius * 0.5, -radius * 0.3);
+                ctx.closePath();
+                ctx.stroke();
+            }
+            break;
+
+        case 'magma':
+            // Magma veins
+            if (segmentIndex % 2 === 0) {
+                ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-radius, 0);
+                ctx.quadraticCurveTo(0, -radius * 0.5, radius, 0);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
             break;
     }
 
