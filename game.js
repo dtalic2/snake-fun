@@ -51,6 +51,8 @@ let player = {
     targetY: 0,
     angle: 0, // Current direction in radians
     speed: 3,
+    baseSpeed: 3,
+    speedBoostTimer: 0, // ms remaining on speed boost
     skin: 'default'
 };
 
@@ -58,6 +60,7 @@ let player = {
 let otherSnakes = [];
 let pellets = [];
 let coins = [];
+let boostBalls = [];
 let particles = [];
 
 // Input
@@ -236,6 +239,12 @@ function spawnInitialEntities() {
         spawnCoin();
     }
 
+    // Spawn boost balls
+    boostBalls = [];
+    for (let i = 0; i < 15; i++) {
+        spawnBoostBall();
+    }
+
     // Spawn other snakes (bots) - always spawn some
     otherSnakes = [];
     for (let i = 0; i < 60; i++) {
@@ -260,6 +269,16 @@ function spawnCoin() {
         radius: 8,
         rotation: 0,
         value: 1
+    });
+}
+
+function spawnBoostBall() {
+    boostBalls.push({
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
+        radius: 12,
+        flashTimer: 0,
+        flashOn: true
     });
 }
 
@@ -502,6 +521,14 @@ function updateUI() {
     document.getElementById('snakes-count').textContent = gameState.playerSnakes.length;
     document.getElementById('player-level').textContent = player.level;
     document.getElementById('player-length').textContent = player.segments.length;
+
+    const boostIndicator = document.getElementById('boost-indicator');
+    if (player.speedBoostTimer > 0) {
+        boostIndicator.style.display = '';
+        document.getElementById('boost-timer').textContent = Math.ceil(player.speedBoostTimer / 1000);
+    } else {
+        boostIndicator.style.display = 'none';
+    }
 }
 
 // Game Loop
@@ -523,12 +550,14 @@ function update(dt) {
     updateOtherSnakes(dt);
     updateCoins(dt);
     updatePellets(dt);
+    updateBoostBalls(dt);
     updateCamera();
     checkCollisions();
 
     // Spawn more entities if needed
     while (pellets.length < 200) spawnPellet();
     while (coins.length < 50) spawnCoin();
+    while (boostBalls.length < 15) spawnBoostBall();
 
     // Maintain snake population
     const targetSnakeCount = gameState.multiplayerMode ? 150 : 80;
@@ -539,6 +568,15 @@ function update(dt) {
 
 function updatePlayer(dt) {
     if (player.segments.length === 0) return;
+
+    // Count down speed boost
+    if (player.speedBoostTimer > 0) {
+        player.speedBoostTimer -= dt;
+        if (player.speedBoostTimer <= 0) {
+            player.speedBoostTimer = 0;
+            player.speed = player.baseSpeed;
+        }
+    }
 
     const head = player.segments[0];
 
@@ -691,6 +729,26 @@ function updatePellets(dt) {
     });
 }
 
+function updateBoostBalls(dt) {
+    boostBalls.forEach(ball => {
+        ball.flashTimer += dt;
+        // Flash every 300ms
+        if (ball.flashTimer >= 300) {
+            ball.flashOn = !ball.flashOn;
+            ball.flashTimer = 0;
+        }
+    });
+
+    // Keep boost HUD in sync every frame
+    if (player.speedBoostTimer > 0) {
+        const boostIndicator = document.getElementById('boost-indicator');
+        boostIndicator.style.display = '';
+        document.getElementById('boost-timer').textContent = Math.ceil(player.speedBoostTimer / 1000);
+    } else {
+        document.getElementById('boost-indicator').style.display = 'none';
+    }
+}
+
 function updateCamera() {
     if (player.segments.length > 0) {
         const head = player.segments[0];
@@ -740,6 +798,21 @@ function checkCollisions() {
         if (distance < head.radius + coin.radius) {
             coins.splice(i, 1);
             gameState.coins += coin.value;
+            updateUI();
+        }
+    }
+
+    // Check boost ball collisions
+    for (let i = boostBalls.length - 1; i >= 0; i--) {
+        const ball = boostBalls[i];
+        const dx = head.x - ball.x;
+        const dy = head.y - ball.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < head.radius + ball.radius) {
+            boostBalls.splice(i, 1);
+            player.speedBoostTimer = 10000; // 10 seconds in ms
+            player.speed = player.baseSpeed * 2;
             updateUI();
         }
     }
@@ -846,6 +919,13 @@ function render() {
         }
     });
 
+    // Draw boost balls
+    boostBalls.forEach(ball => {
+        if (ball.x > viewLeft && ball.x < viewRight && ball.y > viewTop && ball.y < viewBottom) {
+            drawBoostBall(ball);
+        }
+    });
+
     // Draw other snakes
     otherSnakes.forEach(snake => {
         drawSnake(snake, false);
@@ -853,6 +933,69 @@ function render() {
 
     // Draw player snake
     drawSnake(player, true);
+
+    ctx.restore();
+}
+
+function drawBoostBall(ball) {
+    const now = Date.now();
+    // Smooth pulse using sine wave
+    const pulse = 0.6 + Math.sin(now / 150) * 0.4;
+    const r = ball.radius;
+
+    ctx.save();
+    ctx.translate(ball.x, ball.y);
+
+    // Outer glow (always visible, pulses in size)
+    const glowRadius = r * (1.8 + Math.sin(now / 200) * 0.4);
+    const glow = ctx.createRadialGradient(0, 0, r * 0.3, 0, 0, glowRadius);
+    if (ball.flashOn) {
+        glow.addColorStop(0, `rgba(255, 255, 50, ${0.7 * pulse})`);
+        glow.addColorStop(0.5, `rgba(255, 180, 0, ${0.35 * pulse})`);
+        glow.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    } else {
+        glow.addColorStop(0, `rgba(200, 240, 255, ${0.5 * pulse})`);
+        glow.addColorStop(0.5, `rgba(100, 200, 255, ${0.25 * pulse})`);
+        glow.addColorStop(1, 'rgba(0, 100, 255, 0)');
+    }
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core ball
+    const coreGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+    if (ball.flashOn) {
+        coreGrad.addColorStop(0, '#fff7a0');
+        coreGrad.addColorStop(0.4, '#ffe000');
+        coreGrad.addColorStop(1, '#ff8c00');
+    } else {
+        coreGrad.addColorStop(0, '#ffffff');
+        coreGrad.addColorStop(0.4, '#80e0ff');
+        coreGrad.addColorStop(1, '#007fff');
+    }
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lightning bolt symbol
+    ctx.fillStyle = ball.flashOn ? 'rgba(255, 80, 0, 0.9)' : 'rgba(0, 30, 120, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(2, -r * 0.65);
+    ctx.lineTo(-r * 0.35, 0.5);
+    ctx.lineTo(0.5, 0.5);
+    ctx.lineTo(-2, r * 0.65);
+    ctx.lineTo(r * 0.35, -0.5);
+    ctx.lineTo(-0.5, -0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.25, -r * 0.28, r * 0.28, r * 0.16, -0.4, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
 }
