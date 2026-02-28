@@ -697,16 +697,14 @@ function checkCollisions() {
             // Increase length
             player.length += 1;
 
-            // Level up every 5 pellets and increase size
-            if (player.length % 5 === 0) {
-                player.level++;
+            // Level up with EVERY pellet and increase size
+            player.level++;
 
-                // Increase all segment radii when leveling up
-                const radiusIncrease = 0.5;
-                player.segments.forEach(segment => {
-                    segment.radius += radiusIncrease;
-                });
-            }
+            // Increase all segment radii when leveling up
+            const radiusIncrease = 0.5;
+            player.segments.forEach(segment => {
+                segment.radius += radiusIncrease;
+            });
 
             updateUI();
         }
