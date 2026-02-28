@@ -36,6 +36,7 @@ let player = {
     length: 10,
     targetX: 0,
     targetY: 0,
+    angle: 0, // Current direction in radians
     speed: 3,
     skin: 'default'
 };
@@ -153,6 +154,13 @@ function setupJoystick() {
         joystickActive = false;
         joystickCurrent = { x: 0, y: 0 };
         stick.style.transform = 'translate(-50%, -50%)';
+
+        // Keep moving in current direction when joystick is released
+        if (player.segments.length > 0) {
+            const head = player.segments[0];
+            player.targetX = head.x + Math.cos(player.angle) * 1000;
+            player.targetY = head.y + Math.sin(player.angle) * 1000;
+        }
     });
 }
 
@@ -190,7 +198,9 @@ function initializePlayer() {
             radius: 8 + i * 0.2
         });
     }
-    player.targetX = startX;
+    // Initialize with angle pointing right
+    player.angle = 0;
+    player.targetX = startX + 100;
     player.targetY = startY;
     player.level = gameState.playerSnakes[gameState.currentSnakeIndex].level;
     player.skin = gameState.selectedSkin;
@@ -493,46 +503,58 @@ function updatePlayer(dt) {
     if (player.segments.length === 0) return;
 
     const head = player.segments[0];
+
+    // Calculate desired angle based on target position
     const dx = player.targetX - head.x;
     const dy = player.targetY - head.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const targetAngle = Math.atan2(dy, dx);
 
-    if (distance > 1) {
-        const moveX = (dx / distance) * player.speed;
-        const moveY = (dy / distance) * player.speed;
+    // Smoothly rotate towards target angle
+    const turnSpeed = 0.08; // How fast the snake can turn
+    let angleDiff = targetAngle - player.angle;
 
-        // Move head
-        const newHead = {
-            x: head.x + moveX,
-            y: head.y + moveY,
-            radius: head.radius
-        };
+    // Normalize angle difference to -PI to PI range
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-        // Keep within world bounds
-        newHead.x = Math.max(0, Math.min(WORLD_SIZE, newHead.x));
-        newHead.y = Math.max(0, Math.min(WORLD_SIZE, newHead.y));
+    // Apply turning
+    player.angle += angleDiff * turnSpeed;
 
-        player.segments.unshift(newHead);
+    // Move continuously in current direction
+    const moveX = Math.cos(player.angle) * player.speed;
+    const moveY = Math.sin(player.angle) * player.speed;
 
-        // Keep segments at correct length
-        if (player.segments.length > player.length) {
-            player.segments.pop();
-        }
+    // Move head
+    const newHead = {
+        x: head.x + moveX,
+        y: head.y + moveY,
+        radius: head.radius
+    };
 
-        // Update segments to follow
-        for (let i = 1; i < player.segments.length; i++) {
-            const prev = player.segments[i - 1];
-            const current = player.segments[i];
-            const segDx = prev.x - current.x;
-            const segDy = prev.y - current.y;
-            const segDist = Math.sqrt(segDx * segDx + segDy * segDy);
+    // Keep within world bounds
+    newHead.x = Math.max(0, Math.min(WORLD_SIZE, newHead.x));
+    newHead.y = Math.max(0, Math.min(WORLD_SIZE, newHead.y));
 
-            const targetDist = 8;
-            if (segDist > targetDist) {
-                const ratio = (segDist - targetDist) / segDist;
-                current.x += segDx * ratio * 0.5;
-                current.y += segDy * ratio * 0.5;
-            }
+    player.segments.unshift(newHead);
+
+    // Keep segments at correct length
+    if (player.segments.length > player.length) {
+        player.segments.pop();
+    }
+
+    // Update segments to follow
+    for (let i = 1; i < player.segments.length; i++) {
+        const prev = player.segments[i - 1];
+        const current = player.segments[i];
+        const segDx = prev.x - current.x;
+        const segDy = prev.y - current.y;
+        const segDist = Math.sqrt(segDx * segDx + segDy * segDy);
+
+        const targetDist = 8;
+        if (segDist > targetDist) {
+            const ratio = (segDist - targetDist) / segDist;
+            current.x += segDx * ratio * 0.5;
+            current.y += segDy * ratio * 0.5;
         }
     }
 }
