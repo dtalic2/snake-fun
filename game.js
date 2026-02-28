@@ -66,7 +66,7 @@ let joystickOrigin = { x: 0, y: 0 };
 let joystickCurrent = { x: 0, y: 0 };
 
 // Camera
-let camera = { x: 0, y: 0 };
+let camera = { x: 0, y: 0, zoom: 1 };
 
 // World bounds
 const WORLD_SIZE = 4000;
@@ -182,8 +182,8 @@ function handleMouseMove(e) {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    player.targetX = camera.x + mouseX;
-    player.targetY = camera.y + mouseY;
+    player.targetX = camera.x + mouseX / camera.zoom;
+    player.targetY = camera.y + mouseY / camera.zoom;
 }
 
 function handleTouchMove(e) {
@@ -194,8 +194,8 @@ function handleTouchMove(e) {
         const touchX = touch.clientX - rect.left;
         const touchY = touch.clientY - rect.top;
 
-        player.targetX = camera.x + touchX;
-        player.targetY = camera.y + touchY;
+        player.targetX = camera.x + touchX / camera.zoom;
+        player.targetY = camera.y + touchY / camera.zoom;
     }
 }
 
@@ -673,8 +673,14 @@ function updateCoins(dt) {
 function updateCamera() {
     if (player.segments.length > 0) {
         const head = player.segments[0];
-        camera.x = head.x - gameWidth / 2;
-        camera.y = head.y - gameHeight / 2;
+
+        // Zoom out as snake gets longer
+        const targetZoom = Math.max(0.45, 1.0 - (player.segments.length - 10) * 0.004);
+        camera.zoom += (targetZoom - camera.zoom) * 0.05; // Smooth lerp
+
+        // Center camera on head, accounting for zoom
+        camera.x = head.x - (gameWidth / 2) / camera.zoom;
+        camera.y = head.y - (gameHeight / 2) / camera.zoom;
     }
 }
 
@@ -761,30 +767,35 @@ function render() {
     ctx.fillStyle = '#34495e';
     ctx.fillRect(0, 0, gameWidth, gameHeight);
 
+    // Apply camera zoom and offset
+    ctx.save();
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(-camera.x, -camera.y);
+
+    const cullMargin = 50 / camera.zoom;
+    const viewLeft = camera.x - cullMargin;
+    const viewRight = camera.x + gameWidth / camera.zoom + cullMargin;
+    const viewTop = camera.y - cullMargin;
+    const viewBottom = camera.y + gameHeight / camera.zoom + cullMargin;
+
     // Draw grid
     drawGrid();
 
     // Draw pellets
     pellets.forEach(pellet => {
-        const screenX = pellet.x - camera.x;
-        const screenY = pellet.y - camera.y;
-
-        if (screenX > -50 && screenX < gameWidth + 50 && screenY > -50 && screenY < gameHeight + 50) {
+        if (pellet.x > viewLeft && pellet.x < viewRight && pellet.y > viewTop && pellet.y < viewBottom) {
             ctx.fillStyle = pellet.color;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, pellet.radius, 0, Math.PI * 2);
+            ctx.arc(pellet.x, pellet.y, pellet.radius, 0, Math.PI * 2);
             ctx.fill();
         }
     });
 
     // Draw coins
     coins.forEach(coin => {
-        const screenX = coin.x - camera.x;
-        const screenY = coin.y - camera.y;
-
-        if (screenX > -50 && screenX < gameWidth + 50 && screenY > -50 && screenY < gameHeight + 50) {
+        if (coin.x > viewLeft && coin.x < viewRight && coin.y > viewTop && coin.y < viewBottom) {
             ctx.save();
-            ctx.translate(screenX, screenY);
+            ctx.translate(coin.x, coin.y);
             ctx.rotate(coin.rotation);
 
             ctx.fillStyle = '#f39c12';
@@ -813,6 +824,8 @@ function render() {
 
     // Draw player snake
     drawSnake(player, true);
+
+    ctx.restore();
 }
 
 function drawGrid() {
@@ -820,254 +833,236 @@ function drawGrid() {
     ctx.lineWidth = 1;
 
     const gridSize = 50;
+    const viewW = gameWidth / camera.zoom;
+    const viewH = gameHeight / camera.zoom;
     const startX = Math.floor(camera.x / gridSize) * gridSize;
     const startY = Math.floor(camera.y / gridSize) * gridSize;
 
-    for (let x = startX; x < camera.x + gameWidth; x += gridSize) {
+    for (let x = startX; x < camera.x + viewW; x += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(x - camera.x, 0);
-        ctx.lineTo(x - camera.x, gameHeight);
+        ctx.moveTo(x, camera.y);
+        ctx.lineTo(x, camera.y + viewH);
         ctx.stroke();
     }
 
-    for (let y = startY; y < camera.y + gameHeight; y += gridSize) {
+    for (let y = startY; y < camera.y + viewH; y += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(0, y - camera.y);
-        ctx.lineTo(gameWidth, y - camera.y);
+        ctx.moveTo(camera.x, y);
+        ctx.lineTo(camera.x + viewW, y);
         ctx.stroke();
     }
 }
 
+function buildSnakePath(segments) {
+    // Build a smooth path through segment centers using quadratic bezier curves
+    if (segments.length < 2) return null;
+    const path = new Path2D();
+    path.moveTo(segments[0].x, segments[0].y);
+    for (let i = 1; i < segments.length - 1; i++) {
+        const midX = (segments[i].x + segments[i + 1].x) / 2;
+        const midY = (segments[i].y + segments[i + 1].y) / 2;
+        path.quadraticCurveTo(segments[i].x, segments[i].y, midX, midY);
+    }
+    const last = segments[segments.length - 1];
+    path.lineTo(last.x, last.y);
+    return path;
+}
+
 function drawSnake(snake, isPlayer) {
+    if (snake.segments.length === 0) return;
     const skin = skins.find(s => s.id === snake.skin) || skins[0];
 
-    // Draw smooth body with connected segments
-    for (let i = snake.segments.length - 1; i >= 0; i--) {
-        const segment = snake.segments[i];
-        const screenX = segment.x - camera.x;
-        const screenY = segment.y - camera.y;
+    let baseColor = skin.color;
+    let secondColor = skin.secondColor || skin.color;
+    if (skin.color === 'rainbow') {
+        const hue = Date.now() / 50 % 360;
+        baseColor = `hsl(${hue}, 70%, 50%)`;
+        secondColor = `hsl(${(hue + 30) % 360}, 70%, 45%)`;
+    }
 
-        if (screenX > -50 && screenX < gameWidth + 50 && screenY > -50 && screenY < gameHeight + 50) {
-            // Get base color
-            let baseColor = skin.color;
-            let secondColor = skin.secondColor || skin.color;
-            if (skin.color === 'rainbow') {
-                const hue = (i * 30) % 360;
-                baseColor = `hsl(${hue}, 70%, 50%)`;
-                secondColor = `hsl(${(hue + 30) % 360}, 70%, 45%)`;
-            }
+    const bodyWidth = snake.segments[0].radius * 2;
 
-            // Calculate segment angle for elongation
-            let segmentAngle = 0;
-            if (i > 0) {
-                const prev = snake.segments[i - 1];
-                segmentAngle = Math.atan2(prev.y - segment.y, prev.x - segment.x);
-            } else if (snake.angle !== undefined) {
-                segmentAngle = snake.angle;
-            }
+    // Draw smooth continuous body as layered strokes
+    if (snake.segments.length >= 2) {
+        const path = buildSnakePath(snake.segments);
 
-            // Size variation for realistic taper
-            const taperFactor = i === 0 ? 1.2 : (i === snake.segments.length - 1 ? 0.7 : 1);
-            const segmentRadius = segment.radius * taperFactor;
+        // Layer 1: Drop shadow
+        ctx.save();
+        ctx.translate(3, 3);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = bodyWidth + 2;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.stroke(path);
+        ctx.restore();
 
-            ctx.save();
-            ctx.translate(screenX, screenY);
-            ctx.rotate(segmentAngle);
+        // Layer 2: Dark outline/edge
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = bodyWidth + 4;
+        ctx.strokeStyle = secondColor;
+        ctx.stroke(path);
 
-            // Draw elongated body segment with realistic proportions
-            const radiusX = segmentRadius * 1.6; // More elongated for realistic look
-            const radiusY = segmentRadius * 1.1;
+        // Layer 3: Main body color
+        ctx.lineWidth = bodyWidth;
+        ctx.strokeStyle = baseColor;
+        ctx.stroke(path);
 
-            // Drop shadow beneath snake
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        // Layer 4: Specular highlight (thinner, offset upward)
+        ctx.save();
+        ctx.translate(0, -bodyWidth * 0.15);
+        ctx.lineWidth = bodyWidth * 0.45;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.stroke(path);
+        ctx.restore();
+
+        // Layer 5: Top shine (very thin bright line)
+        ctx.save();
+        ctx.translate(0, -bodyWidth * 0.25);
+        ctx.lineWidth = bodyWidth * 0.15;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.stroke(path);
+        ctx.restore();
+
+        // Tail taper: draw smaller circles near the end to taper
+        const taperCount = Math.min(5, snake.segments.length - 1);
+        for (let i = 0; i < taperCount; i++) {
+            const seg = snake.segments[snake.segments.length - 1 - i];
+            const t = (taperCount - i) / taperCount;
+            const r = (bodyWidth / 2) * t;
             ctx.beginPath();
-            ctx.ellipse(2, radiusY * 0.8, radiusX * 0.9, radiusY * 0.4, 0, 0, Math.PI * 2);
+            ctx.arc(seg.x, seg.y, bodyWidth / 2 - r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = baseColor;
             ctx.fill();
-
-            // Main body with cylindrical gradient
-            const bodyGradient = ctx.createLinearGradient(0, -radiusY * 1.2, 0, radiusY * 1.2);
-            bodyGradient.addColorStop(0, secondColor);
-            bodyGradient.addColorStop(0.2, baseColor);
-            bodyGradient.addColorStop(0.5, baseColor);
-            bodyGradient.addColorStop(0.8, baseColor);
-            bodyGradient.addColorStop(1, secondColor);
-            ctx.fillStyle = bodyGradient;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Specular highlight (top shine)
-            const specularGradient = ctx.createRadialGradient(radiusX * 0.2, -radiusY * 0.5, 0, radiusX * 0.2, -radiusY * 0.5, radiusY * 1.2);
-            specularGradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
-            specularGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.3)');
-            specularGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.1)');
-            specularGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = specularGradient;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Secondary highlight for extra depth
-            const secondaryHighlight = ctx.createRadialGradient(-radiusX * 0.3, -radiusY * 0.3, 0, -radiusX * 0.3, -radiusY * 0.3, radiusY * 0.7);
-            secondaryHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-            secondaryHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = secondaryHighlight;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.restore();
-
-            // Draw pattern overlay
-            drawSnakePattern(skin.pattern, screenX, screenY, segmentRadius, baseColor, i, segmentAngle);
-
-            // Subtle outline for definition
-            ctx.save();
-            ctx.translate(screenX, screenY);
-            ctx.rotate(segmentAngle);
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
         }
     }
 
-    // Draw enhanced realistic head
-    if (snake.segments.length > 0) {
-        const head = snake.segments[0];
-        const screenX = head.x - camera.x;
-        const screenY = head.y - camera.y;
+    // Draw head
+    const head = snake.segments[0];
+    const angle = snake.angle !== undefined ? snake.angle : Math.atan2(snake.targetY - head.y, snake.targetX - head.x);
 
-        const angle = snake.angle !== undefined ? snake.angle : Math.atan2(snake.targetY - head.y, snake.targetX - head.x);
+    ctx.save();
+    ctx.translate(head.x, head.y);
+    ctx.rotate(angle);
 
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.rotate(angle);
+    const headLength = head.radius * 1.6;
+    const headWidth = head.radius * 1.1;
 
-        // Get colors
-        let baseColor = skin.color;
-        let secondColor = skin.secondColor || skin.color;
-        if (skin.color === 'rainbow') {
-            const hue = Date.now() / 50 % 360;
-            baseColor = `hsl(${hue}, 70%, 50%)`;
-            secondColor = `hsl(${(hue + 30) % 360}, 70%, 45%)`;
-        }
+    // Head shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.beginPath();
+    ctx.ellipse(3, 3, headLength, headWidth, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Draw head shape (slightly larger and more detailed)
-        const headLength = head.radius * 1.8;
-        const headWidth = head.radius * 1.2;
+    // Head body with gradient
+    const headGradient = ctx.createLinearGradient(0, -headWidth * 1.2, 0, headWidth * 1.2);
+    headGradient.addColorStop(0, secondColor);
+    headGradient.addColorStop(0.3, baseColor);
+    headGradient.addColorStop(0.7, baseColor);
+    headGradient.addColorStop(1, secondColor);
+    ctx.fillStyle = headGradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Head shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(2, 2, headLength, headWidth, 0, 0, Math.PI * 2);
-        ctx.fill();
+    // Head highlight
+    const headHighlight = ctx.createRadialGradient(headLength * 0.1, -headWidth * 0.4, 0, 0, 0, headWidth * 1.3);
+    headHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+    headHighlight.addColorStop(0.4, 'rgba(255, 255, 255, 0.2)');
+    headHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = headHighlight;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Head gradient
-        const headGradient = ctx.createLinearGradient(0, -headWidth, 0, headWidth);
-        headGradient.addColorStop(0, secondColor);
-        headGradient.addColorStop(0.4, baseColor);
-        headGradient.addColorStop(0.6, baseColor);
-        headGradient.addColorStop(1, secondColor);
-        ctx.fillStyle = headGradient;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
-        ctx.fill();
+    // Head outline
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+    ctx.stroke();
 
-        // Head highlight
-        const headHighlight = ctx.createRadialGradient(0, -headWidth * 0.3, 0, 0, 0, headWidth * 1.5);
-        headHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
-        headHighlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-        headHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = headHighlight;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
-        ctx.fill();
+    // Eyes - larger and rounder (Snake Clash style)
+    const eyeOffsetX = headLength * 0.35;
+    const eyeOffsetY = headWidth * 0.4;
+    const eyeRadius = 4.5;
 
-        // Head outline
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, headLength, headWidth, 0, 0, Math.PI * 2);
-        ctx.stroke();
+    // Left eye white
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX, -eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-        // Eyes (more realistic positioning)
-        const eyeY = -headWidth * 0.3;
-        const eyeX = headLength * 0.4;
+    // Left pupil (round, not slit)
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX + 1.5, -eyeOffsetY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Left eye
-        ctx.fillStyle = '#f1c40f';
-        ctx.beginPath();
-        ctx.ellipse(-eyeX, eyeY, 3.5, 4.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+    // Left eye glint
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX + 2.5, -eyeOffsetY - 1.5, 1, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Left pupil (slit)
+    // Right eye white
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX, eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Right pupil
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX + 1.5, eyeOffsetY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right eye glint
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(eyeOffsetX + 2.5, eyeOffsetY - 1.5, 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Forked tongue
+    const tongueLength = 12;
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(headLength - 2, 0);
+    ctx.lineTo(headLength + tongueLength, 0);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(headLength + tongueLength, 0);
+    ctx.lineTo(headLength + tongueLength + 4, -3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(headLength + tongueLength, 0);
+    ctx.lineTo(headLength + tongueLength + 4, 3);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Draw level indicator
+    if (isPlayer) {
+        ctx.fillStyle = 'white';
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-eyeX, eyeY - 3);
-        ctx.lineTo(-eyeX, eyeY + 3);
-        ctx.stroke();
-
-        // Right eye
-        ctx.fillStyle = '#f1c40f';
-        ctx.beginPath();
-        ctx.ellipse(-eyeX, -eyeY, 3.5, 4.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Right pupil (slit)
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-eyeX, -eyeY - 3);
-        ctx.lineTo(-eyeX, -eyeY + 3);
-        ctx.stroke();
-
-        // Forked tongue
-        const tongueLength = 15;
-        ctx.strokeStyle = '#e74c3c';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(headLength - 2, 0);
-        ctx.lineTo(headLength + tongueLength, 0);
-        ctx.stroke();
-
-        // Tongue forks
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(headLength + tongueLength, 0);
-        ctx.lineTo(headLength + tongueLength + 4, -3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(headLength + tongueLength, 0);
-        ctx.lineTo(headLength + tongueLength + 4, 3);
-        ctx.stroke();
-
-        ctx.restore();
-
-        // Draw level indicator
-        if (isPlayer) {
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 3;
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.strokeText(`Lv.${snake.level}`, screenX, screenY - head.radius - 18);
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 18);
-        } else {
-            ctx.fillStyle = snake.level > player.level ? '#e74c3c' : '#95a5a6';
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 14);
-        }
+        ctx.lineWidth = 3;
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.strokeText(`Lv.${snake.level}`, head.x, head.y - head.radius - 18);
+        ctx.fillText(`Lv.${snake.level}`, head.x, head.y - head.radius - 18);
+    } else {
+        ctx.fillStyle = snake.level > player.level ? '#e74c3c' : '#95a5a6';
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Lv.${snake.level}`, head.x, head.y - head.radius - 14);
     }
 }
 
