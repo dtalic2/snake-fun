@@ -203,19 +203,24 @@ function initializePlayer() {
     const startX = WORLD_SIZE / 2;
     const startY = WORLD_SIZE / 2;
 
+    // Set level first
+    player.level = gameState.playerSnakes[gameState.currentSnakeIndex].level;
+
+    // Calculate base radius based on level
+    const baseRadius = 8 + (player.level - 1) * 0.5;
+
     player.segments = [];
     for (let i = 0; i < player.length; i++) {
         player.segments.push({
             x: startX - i * 10,
             y: startY,
-            radius: 8 + i * 0.2
+            radius: baseRadius + i * 0.2
         });
     }
     // Initialize with angle pointing right
     player.angle = 0;
     player.targetX = startX + 100;
     player.targetY = startY;
-    player.level = gameState.playerSnakes[gameState.currentSnakeIndex].level;
     player.skin = gameState.selectedSkin;
 }
 
@@ -688,12 +693,21 @@ function checkCollisions() {
 
         if (distance < head.radius + pellet.radius) {
             pellets.splice(i, 1);
+
+            // Increase length
             player.length += 1;
 
-            // Each pellet gives XP and levels up every 10 pellets
-            if (player.length % 10 === 0) {
+            // Level up every 5 pellets and increase size
+            if (player.length % 5 === 0) {
                 player.level++;
+
+                // Increase all segment radii when leveling up
+                const radiusIncrease = 0.5;
+                player.segments.forEach(segment => {
+                    segment.radius += radiusIncrease;
+                });
             }
+
             updateUI();
         }
     }
@@ -726,8 +740,26 @@ function checkCollisions() {
             // Can only eat snakes of lower level
             if (player.level > otherSnake.level) {
                 otherSnakes.splice(i, 1);
-                player.length += 10;
-                gameState.coins += 10;
+
+                // Rewards scale with eaten snake's level
+                const lengthGain = 10 + otherSnake.level * 3;
+                const coinGain = 10 + otherSnake.level * 5;
+                const levelGain = Math.floor(otherSnake.level / 2);
+
+                player.length += lengthGain;
+                gameState.coins += coinGain;
+
+                // Gain levels based on eaten snake's level
+                if (levelGain > 0) {
+                    player.level += levelGain;
+
+                    // Increase size when gaining levels
+                    const radiusIncrease = levelGain * 0.5;
+                    player.segments.forEach(segment => {
+                        segment.radius += radiusIncrease;
+                    });
+                }
+
                 updateUI();
             } else if (player.level < otherSnake.level) {
                 // Player got eaten - respawn
