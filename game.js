@@ -232,8 +232,11 @@ function spawnInitialEntities() {
         spawnCoin();
     }
 
-    // Spawn other snakes (bots)
+    // Spawn other snakes (bots) - always spawn some
     otherSnakes = [];
+    for (let i = 0; i < 30; i++) {
+        spawnBotSnake();
+    }
 }
 
 function spawnPellet() {
@@ -257,8 +260,8 @@ function spawnCoin() {
 }
 
 function spawnBotSnake() {
-    const level = Math.floor(Math.random() * 5) + 1;
-    const length = 10 + level * 5;
+    const level = Math.floor(Math.random() * 8) + 1; // Levels 1-8
+    const length = 15 + level * 6; // Longer snakes
     const segments = [];
     const startX = Math.random() * WORLD_SIZE;
     const startY = Math.random() * WORLD_SIZE;
@@ -267,16 +270,17 @@ function spawnBotSnake() {
         segments.push({
             x: startX - i * 10,
             y: startY,
-            radius: 8 + i * 0.2
+            radius: 7 + i * 0.15 // Slightly varied radius growth
         });
     }
 
     otherSnakes.push({
         segments,
         level,
+        angle: Math.random() * Math.PI * 2, // Random starting angle
         targetX: startX + (Math.random() - 0.5) * 500,
         targetY: startY + (Math.random() - 0.5) * 500,
-        speed: 2 + Math.random(),
+        speed: 2 + Math.random() * 1.5, // Varied speeds
         skin: skins[Math.floor(Math.random() * skins.length)].id,
         isBot: true,
         changeTargetTimer: 0
@@ -296,14 +300,24 @@ function toggleExplore() {
         document.getElementById('explore-btn').textContent = '🌍 Exploring...';
         document.getElementById('explore-btn').style.background = '#e67e22';
 
-        // Spawn bot snakes to simulate multiplayer
-        for (let i = 0; i < 10; i++) {
+        // Spawn many bot snakes to simulate multiplayer
+        for (let i = 0; i < 50; i++) {
             spawnBotSnake();
         }
     } else {
         document.getElementById('explore-btn').textContent = '🌍 Explore';
         document.getElementById('explore-btn').style.background = '#27ae60';
-        otherSnakes = [];
+        // Remove snakes that are far away, keep nearby ones
+        otherSnakes = otherSnakes.filter(snake => {
+            if (snake.segments.length === 0) return false;
+            const head = snake.segments[0];
+            const playerHead = player.segments[0];
+            if (!playerHead) return false;
+            const dx = head.x - playerHead.x;
+            const dy = head.y - playerHead.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < 1000; // Keep snakes within 1000 units
+        });
     }
 }
 
@@ -510,6 +524,12 @@ function update(dt) {
     // Spawn more entities if needed
     while (pellets.length < 200) spawnPellet();
     while (coins.length < 50) spawnCoin();
+
+    // Maintain snake population
+    const targetSnakeCount = gameState.multiplayerMode ? 80 : 40;
+    while (otherSnakes.length < targetSnakeCount) {
+        spawnBotSnake();
+    }
 }
 
 function updatePlayer(dt) {
@@ -579,51 +599,62 @@ function updateOtherSnakes(dt) {
         // Bot AI: change target periodically
         snake.changeTargetTimer -= dt;
         if (snake.changeTargetTimer <= 0) {
-            snake.targetX = snake.segments[0].x + (Math.random() - 0.5) * 500;
-            snake.targetY = snake.segments[0].y + (Math.random() - 0.5) * 500;
+            snake.targetX = snake.segments[0].x + (Math.random() - 0.5) * 600;
+            snake.targetY = snake.segments[0].y + (Math.random() - 0.5) * 600;
             snake.targetX = Math.max(0, Math.min(WORLD_SIZE, snake.targetX));
             snake.targetY = Math.max(0, Math.min(WORLD_SIZE, snake.targetY));
-            snake.changeTargetTimer = 2000 + Math.random() * 3000;
+            snake.changeTargetTimer = 1500 + Math.random() * 2500;
         }
 
         const head = snake.segments[0];
+
+        // Use angle-based movement like player
         const dx = snake.targetX - head.x;
         const dy = snake.targetY - head.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const targetAngle = Math.atan2(dy, dx);
 
-        if (distance > 1) {
-            const moveX = (dx / distance) * snake.speed;
-            const moveY = (dy / distance) * snake.speed;
+        // Smooth turning
+        const turnSpeed = 0.06 + Math.random() * 0.03; // Slightly varied turn speed
+        let angleDiff = targetAngle - snake.angle;
 
-            const newHead = {
-                x: head.x + moveX,
-                y: head.y + moveY,
-                radius: head.radius
-            };
+        // Normalize angle difference
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-            newHead.x = Math.max(0, Math.min(WORLD_SIZE, newHead.x));
-            newHead.y = Math.max(0, Math.min(WORLD_SIZE, newHead.y));
+        snake.angle += angleDiff * turnSpeed;
 
-            snake.segments.unshift(newHead);
+        // Move continuously
+        const moveX = Math.cos(snake.angle) * snake.speed;
+        const moveY = Math.sin(snake.angle) * snake.speed;
 
-            if (snake.segments.length > 10 + snake.level * 5) {
-                snake.segments.pop();
-            }
+        const newHead = {
+            x: head.x + moveX,
+            y: head.y + moveY,
+            radius: head.radius
+        };
 
-            // Simple follow logic
-            for (let i = 1; i < snake.segments.length; i++) {
-                const prev = snake.segments[i - 1];
-                const current = snake.segments[i];
-                const segDx = prev.x - current.x;
-                const segDy = prev.y - current.y;
-                const segDist = Math.sqrt(segDx * segDx + segDy * segDy);
+        newHead.x = Math.max(0, Math.min(WORLD_SIZE, newHead.x));
+        newHead.y = Math.max(0, Math.min(WORLD_SIZE, newHead.y));
 
-                const targetDist = 8;
-                if (segDist > targetDist) {
-                    const ratio = (segDist - targetDist) / segDist;
-                    current.x += segDx * ratio * 0.5;
-                    current.y += segDy * ratio * 0.5;
-                }
+        snake.segments.unshift(newHead);
+
+        if (snake.segments.length > 15 + snake.level * 6) {
+            snake.segments.pop();
+        }
+
+        // Smooth follow logic
+        for (let i = 1; i < snake.segments.length; i++) {
+            const prev = snake.segments[i - 1];
+            const current = snake.segments[i];
+            const segDx = prev.x - current.x;
+            const segDy = prev.y - current.y;
+            const segDist = Math.sqrt(segDx * segDx + segDy * segDy);
+
+            const targetDist = 7;
+            if (segDist > targetDist) {
+                const ratio = (segDist - targetDist) / segDist;
+                current.x += segDx * ratio * 0.5;
+                current.y += segDy * ratio * 0.5;
             }
         }
     });
@@ -793,7 +824,7 @@ function drawGrid() {
 function drawSnake(snake, isPlayer) {
     const skin = skins.find(s => s.id === snake.skin) || skins[0];
 
-    // Draw body with elongated segments (more realistic)
+    // Draw smooth body with connected segments
     for (let i = snake.segments.length - 1; i >= 0; i--) {
         const segment = snake.segments[i];
         const screenX = segment.x - camera.x;
@@ -818,55 +849,67 @@ function drawSnake(snake, isPlayer) {
                 segmentAngle = snake.angle;
             }
 
+            // Size variation for realistic taper
+            const taperFactor = i === 0 ? 1.2 : (i === snake.segments.length - 1 ? 0.7 : 1);
+            const segmentRadius = segment.radius * taperFactor;
+
             ctx.save();
             ctx.translate(screenX, screenY);
             ctx.rotate(segmentAngle);
 
-            // Draw elongated body segment
-            const radiusX = segment.radius * 1.4; // Elongated
-            const radiusY = segment.radius;
+            // Draw elongated body segment with realistic proportions
+            const radiusX = segmentRadius * 1.6; // More elongated for realistic look
+            const radiusY = segmentRadius * 1.1;
 
-            // Shadow/depth layer
-            const shadowGradient = ctx.createRadialGradient(0, radiusY * 0.3, 0, 0, 0, radiusY * 1.2);
-            shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
-            ctx.fillStyle = shadowGradient;
+            // Drop shadow beneath snake
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
             ctx.beginPath();
-            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+            ctx.ellipse(2, radiusY * 0.8, radiusX * 0.9, radiusY * 0.4, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Main body gradient (3D effect)
-            const bodyGradient = ctx.createLinearGradient(0, -radiusY, 0, radiusY);
+            // Main body with cylindrical gradient
+            const bodyGradient = ctx.createLinearGradient(0, -radiusY * 1.2, 0, radiusY * 1.2);
             bodyGradient.addColorStop(0, secondColor);
-            bodyGradient.addColorStop(0.3, baseColor);
-            bodyGradient.addColorStop(0.7, baseColor);
+            bodyGradient.addColorStop(0.2, baseColor);
+            bodyGradient.addColorStop(0.5, baseColor);
+            bodyGradient.addColorStop(0.8, baseColor);
             bodyGradient.addColorStop(1, secondColor);
             ctx.fillStyle = bodyGradient;
             ctx.beginPath();
             ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Top highlight for shininess
-            const highlightGradient = ctx.createRadialGradient(0, -radiusY * 0.4, 0, 0, -radiusY * 0.4, radiusY * 0.8);
-            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-            highlightGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-            highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = highlightGradient;
+            // Specular highlight (top shine)
+            const specularGradient = ctx.createRadialGradient(radiusX * 0.2, -radiusY * 0.5, 0, radiusX * 0.2, -radiusY * 0.5, radiusY * 1.2);
+            specularGradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+            specularGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.3)');
+            specularGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.1)');
+            specularGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = specularGradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Secondary highlight for extra depth
+            const secondaryHighlight = ctx.createRadialGradient(-radiusX * 0.3, -radiusY * 0.3, 0, -radiusX * 0.3, -radiusY * 0.3, radiusY * 0.7);
+            secondaryHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+            secondaryHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = secondaryHighlight;
             ctx.beginPath();
             ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.restore();
 
-            // Draw pattern overlay (back to regular coordinates)
-            drawSnakePattern(skin.pattern, screenX, screenY, segment.radius, baseColor, i, segmentAngle);
+            // Draw pattern overlay
+            drawSnakePattern(skin.pattern, screenX, screenY, segmentRadius, baseColor, i, segmentAngle);
 
-            // Outline for definition
+            // Subtle outline for definition
             ctx.save();
             ctx.translate(screenX, screenY);
             ctx.rotate(segmentAngle);
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.lineWidth = 0.8;
             ctx.beginPath();
             ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
             ctx.stroke();
