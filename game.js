@@ -247,7 +247,7 @@ function spawnPellet() {
     pellets.push({
         x: Math.random() * WORLD_SIZE,
         y: Math.random() * WORLD_SIZE,
-        radius: 5,
+        radius: 8 + Math.random() * 6,
         color: `hsl(${Math.random() * 360}, 70%, 60%)`,
         xpValue: 1
     });
@@ -935,6 +935,20 @@ function drawSnake(snake, isPlayer) {
             ctx.fillStyle = baseColor;
             ctx.fill();
         }
+
+        // Draw pattern overlay on body segments
+        if (skin.pattern !== 'smooth' && skin.pattern !== 'rainbow') {
+            const radius = bodyWidth / 2;
+            for (let i = 1; i < snake.segments.length; i++) {
+                const seg = snake.segments[i];
+                let segAngle = 0;
+                if (i > 0) {
+                    const prev = snake.segments[i - 1];
+                    segAngle = Math.atan2(prev.y - seg.y, prev.x - seg.x);
+                }
+                drawSnakePattern(skin.pattern, seg.x, seg.y, radius, baseColor, secondColor, i, segAngle);
+            }
+        }
     }
 
     // Draw head
@@ -1066,327 +1080,357 @@ function drawSnake(snake, isPlayer) {
     }
 }
 
-function drawSnakePattern(pattern, x, y, radius, baseColor, segmentIndex, angle = 0) {
+function drawSnakePattern(pattern, x, y, radius, baseColor, secondColor, segmentIndex, angle) {
     ctx.save();
     ctx.translate(x, y);
     if (angle) ctx.rotate(angle);
 
+    const r = radius;
+
     switch (pattern) {
-        case 'scales':
-            // Hexagonal scales
-            for (let row = -1; row <= 1; row++) {
-                for (let col = -1; col <= 1; col++) {
-                    const scaleX = col * 5;
-                    const scaleY = row * 5 + (col % 2) * 2.5;
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
-                    ctx.lineWidth = 0.8;
-                    ctx.beginPath();
-                    ctx.arc(scaleX, scaleY, 2.5, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            }
-            break;
-
-        case 'diamond':
-            // Diamond pattern
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            if (segmentIndex % 3 === 0) {
-                ctx.beginPath();
-                ctx.moveTo(x, y - radius * 0.6);
-                ctx.lineTo(x + radius * 0.4, y);
-                ctx.lineTo(x, y + radius * 0.6);
-                ctx.lineTo(x - radius * 0.4, y);
-                ctx.closePath();
-                ctx.fill();
-            }
-            break;
-
-        case 'bands':
-            // Horizontal bands
-            if (segmentIndex % 4 === 0 || segmentIndex % 4 === 1) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            if (segmentIndex % 12 === 0) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            break;
-
-        case 'spots':
-            // Spotted pattern
+        case 'scales': {
             if (segmentIndex % 2 === 0) {
-                const spots = 3;
-                for (let i = 0; i < spots; i++) {
-                    const angle = (i / spots) * Math.PI * 2;
-                    const spotX = x + Math.cos(angle) * radius * 0.5;
-                    const spotY = y + Math.sin(angle) * radius * 0.5;
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                    ctx.beginPath();
-                    ctx.arc(spotX, spotY, radius * 0.3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            break;
-
-        case 'gradient':
-            // Gradient overlay
-            const gradient = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-
-        case 'stripes':
-            // Tiger stripes
-            if (segmentIndex % 2 === 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.fillRect(x - radius, y - radius * 0.3, radius * 2, radius * 0.2);
-                ctx.fillRect(x - radius, y + radius * 0.3, radius * 2, radius * 0.2);
-            }
-            break;
-
-        case 'hex':
-            // Hexagonal pattern
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const hx = x + Math.cos(angle) * radius * 0.6;
-                const hy = y + Math.sin(angle) * radius * 0.6;
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.arc(hx, hy, 2, 0, Math.PI * 2);
+                ctx.arc(0, -r * 0.2, r * 0.35, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, r * 0.2, r * 0.35, -Math.PI + 0.2, -0.2);
                 ctx.stroke();
             }
             break;
+        }
 
-        case 'cracks':
-            // Lava cracks
-            ctx.strokeStyle = 'rgba(255, 150, 0, 0.8)';
-            ctx.lineWidth = 1.5;
-            if (segmentIndex % 3 === 0) {
-                ctx.beginPath();
-                ctx.moveTo(x - radius, y);
-                ctx.lineTo(x + radius, y);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x, y - radius);
-                ctx.lineTo(x, y + radius);
-                ctx.stroke();
-            }
-            break;
-
-        case 'stars':
-            // Galaxy stars
-            if (segmentIndex % 4 === 0) {
-                for (let i = 0; i < 3; i++) {
-                    const sx = x + (Math.random() - 0.5) * radius;
-                    const sy = y + (Math.random() - 0.5) * radius;
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            break;
-
-        case 'rainbow':
-            // Rainbow already handled in main color
-            break;
-
-        case 'smooth':
-            // Smooth, minimal pattern
-            break;
-
-        case 'cobra':
-            // Cobra hood pattern
-            if (segmentIndex % 3 === 0) {
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(-radius * 0.8, 0);
-                ctx.quadraticCurveTo(0, -radius * 0.6, radius * 0.8, 0);
-                ctx.stroke();
-            }
-            break;
-
-        case 'rattle':
-            // Rattlesnake diamond pattern
-            if (segmentIndex % 2 === 0) {
-                ctx.fillStyle = 'rgba(139, 69, 19, 0.4)';
-                ctx.beginPath();
-                ctx.moveTo(0, -radius * 0.7);
-                ctx.lineTo(radius * 0.5, 0);
-                ctx.lineTo(0, radius * 0.7);
-                ctx.lineTo(-radius * 0.5, 0);
-                ctx.closePath();
-                ctx.fill();
-            }
-            break;
-
-        case 'anaconda':
-            // Large circular spots
+        case 'diamond': {
             if (segmentIndex % 3 === 0) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                 ctx.beginPath();
-                ctx.arc(0, 0, radius * 0.4, 0, Math.PI * 2);
+                ctx.moveTo(-r * 0.6, 0);
+                ctx.lineTo(0, -r * 0.5);
+                ctx.lineTo(r * 0.6, 0);
+                ctx.lineTo(0, r * 0.5);
+                ctx.closePath();
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.lineWidth = 1;
+            }
+            break;
+        }
+
+        case 'bands': {
+            if (segmentIndex % 4 < 2) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (segmentIndex % 8 === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 200, 0.25)';
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+        }
+
+        case 'spots': {
+            if (segmentIndex % 3 === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.beginPath();
+                ctx.ellipse(0, -r * 0.15, r * 0.35, r * 0.28, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+            if (segmentIndex % 3 === 1) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                ctx.beginPath();
+                ctx.arc(r * 0.15, r * 0.2, r * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+        }
+
+        case 'gradient': {
+            const shimmer = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r);
+            shimmer.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+            shimmer.addColorStop(0.5, 'rgba(255, 255, 255, 0.05)');
+            shimmer.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+            ctx.fillStyle = shimmer;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+        }
+
+        case 'stripes': {
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.fillRect(-r * 0.15, -r, r * 0.3, r * 2);
+            }
+            break;
+        }
+
+        case 'hex': {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                const nx = Math.cos(a) * r * 0.55;
+                const ny = Math.sin(a) * r * 0.55;
+                if (i === 0) ctx.moveTo(nx, ny);
+                else ctx.lineTo(nx, ny);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            break;
+        }
+
+        case 'cracks': {
+            if (segmentIndex % 2 === 0) {
+                ctx.strokeStyle = 'rgba(255, 160, 0, 0.9)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.7, -r * 0.3);
+                ctx.lineTo(0, r * 0.1);
+                ctx.lineTo(r * 0.5, -r * 0.4);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 220, 50, 0.6)';
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.3, r * 0.4);
+                ctx.lineTo(r * 0.2, 0);
+                ctx.lineTo(r * 0.7, r * 0.3);
                 ctx.stroke();
             }
             break;
+        }
 
-        case 'copper':
-            // Copper hourglass pattern
-            if (segmentIndex % 4 === 0) {
-                ctx.fillStyle = 'rgba(139, 69, 19, 0.5)';
+        case 'stars': {
+            const seed = segmentIndex * 137;
+            for (let i = 0; i < 4; i++) {
+                const hash = (seed + i * 53) % 100;
+                const sx = (((hash * 7) % 100) / 100 - 0.5) * r * 1.2;
+                const sy = (((hash * 13) % 100) / 100 - 0.5) * r * 1.2;
+                const brightness = 0.4 + ((hash * 3) % 60) / 100;
+                ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
                 ctx.beginPath();
-                ctx.moveTo(-radius * 0.6, -radius * 0.5);
-                ctx.lineTo(0, 0);
-                ctx.lineTo(-radius * 0.6, radius * 0.5);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(radius * 0.6, -radius * 0.5);
-                ctx.lineTo(0, 0);
-                ctx.lineTo(radius * 0.6, radius * 0.5);
+                ctx.arc(sx, sy, 0.8 + (hash % 3) * 0.4, 0, Math.PI * 2);
                 ctx.fill();
             }
             break;
+        }
 
-        case 'glow':
-            // Neon glow effect
-            const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-            glowGradient.addColorStop(0, 'rgba(0, 255, 0, 0.4)');
-            glowGradient.addColorStop(0.7, 'rgba(0, 255, 0, 0.1)');
-            glowGradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
-            ctx.fillStyle = glowGradient;
+        case 'cobra': {
+            if (segmentIndex % 3 === 0) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.5, -r * 0.4);
+                ctx.lineTo(0, r * 0.3);
+                ctx.lineTo(r * 0.5, -r * 0.4);
+                ctx.stroke();
+            }
+            break;
+        }
+
+        case 'rattle': {
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(100, 60, 20, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.5, 0);
+                ctx.lineTo(0, -r * 0.55);
+                ctx.lineTo(r * 0.5, 0);
+                ctx.lineTo(0, r * 0.55);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(200, 170, 100, 0.3)';
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+            break;
+        }
+
+        case 'anaconda': {
+            if (segmentIndex % 4 === 0) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 0.45, r * 0.35, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                ctx.fill();
+            }
+            if (segmentIndex % 4 === 2) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.arc(0, r * 0.15, r * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+        }
+
+        case 'copper': {
+            if (segmentIndex % 3 === 0) {
+                ctx.fillStyle = 'rgba(100, 50, 10, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.7, -r * 0.6);
+                ctx.lineTo(0, -r * 0.1);
+                ctx.lineTo(r * 0.7, -r * 0.6);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.7, r * 0.6);
+                ctx.lineTo(0, r * 0.1);
+                ctx.lineTo(r * 0.7, r * 0.6);
+                ctx.fill();
+            }
+            break;
+        }
+
+        case 'glow': {
+            const pulse = 0.3 + Math.sin(Date.now() / 300 + segmentIndex * 0.5) * 0.15;
+            const glow = ctx.createRadialGradient(0, 0, r * 0.3, 0, 0, r * 1.4);
+            glow.addColorStop(0, `rgba(0, 255, 0, ${pulse})`);
+            glow.addColorStop(0.6, `rgba(0, 255, 0, ${pulse * 0.3})`);
+            glow.addColorStop(1, 'rgba(0, 255, 0, 0)');
+            ctx.fillStyle = glow;
             ctx.beginPath();
-            ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
+            ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
             ctx.fill();
             break;
+        }
 
-        case 'toxic':
-            // Toxic waste drips
+        case 'toxic': {
             if (segmentIndex % 2 === 0) {
-                ctx.fillStyle = 'rgba(46, 204, 17, 0.6)';
-                for (let i = 0; i < 3; i++) {
-                    const dripAngle = (i / 3) * Math.PI * 2;
-                    const dripX = Math.cos(dripAngle) * radius * 0.6;
-                    const dripY = Math.sin(dripAngle) * radius * 0.6;
-                    ctx.beginPath();
-                    ctx.arc(dripX, dripY, radius * 0.2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                const bubbleAlpha = 0.4 + Math.sin(Date.now() / 400 + segmentIndex) * 0.2;
+                ctx.fillStyle = `rgba(50, 220, 20, ${bubbleAlpha})`;
+                ctx.beginPath();
+                ctx.arc(-r * 0.25, -r * 0.3, r * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(r * 0.2, r * 0.2, r * 0.14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(150, 255, 50, 0.3)';
+                ctx.beginPath();
+                ctx.arc(r * 0.1, -r * 0.1, r * 0.08, 0, Math.PI * 2);
+                ctx.fill();
             }
             break;
+        }
 
-        case 'ice':
-            // Ice crystals
-            if (segmentIndex % 3 === 0) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 1.5;
-                for (let i = 0; i < 6; i++) {
-                    const crystalAngle = (i / 6) * Math.PI * 2;
-                    const x1 = Math.cos(crystalAngle) * radius * 0.3;
-                    const y1 = Math.sin(crystalAngle) * radius * 0.3;
-                    const x2 = Math.cos(crystalAngle) * radius * 0.7;
-                    const y2 = Math.sin(crystalAngle) * radius * 0.7;
+        case 'ice': {
+            if (segmentIndex % 2 === 0) {
+                ctx.strokeStyle = 'rgba(200, 230, 255, 0.5)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 3; i++) {
+                    const a = (i / 3) * Math.PI + segmentIndex * 0.3;
                     ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
+                    ctx.moveTo(Math.cos(a) * r * 0.15, Math.sin(a) * r * 0.15);
+                    ctx.lineTo(Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6);
+                    ctx.stroke();
+                    const bx = Math.cos(a) * r * 0.45;
+                    const by = Math.sin(a) * r * 0.45;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(bx + Math.cos(a + 0.8) * r * 0.15, by + Math.sin(a + 0.8) * r * 0.15);
                     ctx.stroke();
                 }
             }
             break;
+        }
 
-        case 'flames':
-            // Fire flames
+        case 'flames': {
             if (segmentIndex % 2 === 0) {
-                ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
-                for (let i = 0; i < 4; i++) {
-                    const flameAngle = (i / 4) * Math.PI * 2;
-                    const flameX = Math.cos(flameAngle) * radius * 0.5;
-                    const flameY = Math.sin(flameAngle) * radius * 0.5;
-                    ctx.beginPath();
-                    ctx.moveTo(flameX, flameY);
-                    ctx.lineTo(flameX * 1.3, flameY * 1.3);
-                    ctx.lineTo(flameX * 0.7, flameY * 1.3);
-                    ctx.fill();
-                }
+                const flicker = Math.sin(Date.now() / 200 + segmentIndex * 2) * 0.15;
+                ctx.fillStyle = `rgba(255, 120, 0, ${0.4 + flicker})`;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.3, r * 0.3);
+                ctx.quadraticCurveTo(-r * 0.1, -r * 0.5, r * 0.1, r * 0.1);
+                ctx.quadraticCurveTo(r * 0.3, -r * 0.6, r * 0.4, r * 0.3);
+                ctx.fill();
+                ctx.fillStyle = `rgba(255, 200, 50, ${0.3 + flicker})`;
+                ctx.beginPath();
+                ctx.moveTo(0, r * 0.2);
+                ctx.quadraticCurveTo(r * 0.05, -r * 0.3, r * 0.2, r * 0.1);
+                ctx.fill();
             }
             break;
+        }
 
-        case 'lightning':
-            // Electric bolts
+        case 'lightning': {
             if (segmentIndex % 3 === 0) {
-                ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 255, 100, 0.8)';
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
-                ctx.moveTo(-radius, 0);
-                ctx.lineTo(-radius * 0.3, -radius * 0.4);
-                ctx.lineTo(0, 0);
-                ctx.lineTo(radius * 0.3, radius * 0.4);
-                ctx.lineTo(radius, 0);
+                ctx.moveTo(-r * 0.6, -r * 0.2);
+                ctx.lineTo(-r * 0.15, r * 0.1);
+                ctx.lineTo(0, -r * 0.15);
+                ctx.lineTo(r * 0.3, r * 0.3);
+                ctx.lineTo(r * 0.6, -r * 0.1);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 255, 200, 0.2)';
+                ctx.lineWidth = 4;
                 ctx.stroke();
             }
             break;
+        }
 
-        case 'shadow':
-            // Shadow wisps
-            if (segmentIndex % 4 === 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                for (let i = 0; i < 3; i++) {
-                    const wispAngle = (i / 3) * Math.PI * 2;
-                    const wispX = Math.cos(wispAngle) * radius * 0.8;
-                    const wispY = Math.sin(wispAngle) * radius * 0.8;
-                    ctx.globalAlpha = 0.3;
-                    ctx.beginPath();
-                    ctx.arc(wispX, wispY, radius * 0.3, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
-                }
+        case 'shadow': {
+            if (segmentIndex % 3 === 0) {
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(-r * 0.2, -r * 0.1, r * 0.4, r * 0.25, 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(r * 0.15, r * 0.15, r * 0.3, r * 0.2, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
             }
             break;
+        }
 
-        case 'crystal':
-            // Crystal facets
+        case 'crystal': {
             if (segmentIndex % 2 === 0) {
-                ctx.strokeStyle = 'rgba(184, 212, 224, 0.6)';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(180, 220, 240, 0.5)';
+                ctx.lineWidth = 0.8;
                 ctx.beginPath();
-                ctx.moveTo(0, -radius * 0.7);
-                ctx.lineTo(radius * 0.5, -radius * 0.3);
-                ctx.lineTo(radius * 0.5, radius * 0.3);
-                ctx.lineTo(0, radius * 0.7);
-                ctx.lineTo(-radius * 0.5, radius * 0.3);
-                ctx.lineTo(-radius * 0.5, -radius * 0.3);
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 + segmentIndex * 0.2;
+                    const fx = Math.cos(a) * r * 0.5;
+                    const fy = Math.sin(a) * r * 0.5;
+                    if (i === 0) ctx.moveTo(fx, fy);
+                    else ctx.lineTo(fx, fy);
+                }
                 ctx.closePath();
                 ctx.stroke();
-            }
-            break;
-
-        case 'magma':
-            // Magma veins
-            if (segmentIndex % 2 === 0) {
-                ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
                 ctx.beginPath();
-                ctx.moveTo(-radius, 0);
-                ctx.quadraticCurveTo(0, -radius * 0.5, radius, 0);
-                ctx.stroke();
-                ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
-                ctx.lineWidth = 1;
+                ctx.moveTo(-r * 0.3, -r * 0.15);
+                ctx.lineTo(r * 0.3, r * 0.15);
                 ctx.stroke();
             }
             break;
+        }
+
+        case 'magma': {
+            if (segmentIndex % 2 === 0) {
+                ctx.strokeStyle = 'rgba(255, 80, 0, 0.7)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.6, -r * 0.2);
+                ctx.quadraticCurveTo(-r * 0.1, r * 0.3, r * 0.5, -r * 0.1);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 200, 50, 0.5)';
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.3, r * 0.3);
+                ctx.quadraticCurveTo(r * 0.1, -r * 0.2, r * 0.6, r * 0.2);
+                ctx.stroke();
+            }
+            break;
+        }
     }
 
     ctx.restore();
