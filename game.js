@@ -11,12 +11,18 @@ const gameState = {
 
 // Skins available in shop
 const skins = [
-    { id: 'default', name: 'Classic Green', color: '#27ae60', price: 0 },
-    { id: 'blue', name: 'Ocean Blue', color: '#3498db', price: 100 },
-    { id: 'red', name: 'Fire Red', color: '#e74c3c', price: 100 },
-    { id: 'purple', name: 'Royal Purple', color: '#9b59b6', price: 150 },
-    { id: 'gold', name: 'Golden', color: '#f39c12', price: 200 },
-    { id: 'rainbow', name: 'Rainbow', color: 'linear', price: 500 }
+    { id: 'default', name: 'Classic Green', color: '#27ae60', pattern: 'scales', price: 0 },
+    { id: 'viper', name: 'Viper', color: '#2c3e50', pattern: 'diamond', price: 100 },
+    { id: 'coral', name: 'Coral Snake', color: '#e74c3c', pattern: 'bands', price: 100 },
+    { id: 'python', name: 'Python', color: '#8b6914', pattern: 'spots', price: 150 },
+    { id: 'ocean', name: 'Ocean Blue', color: '#3498db', pattern: 'gradient', price: 150 },
+    { id: 'emerald', name: 'Emerald', color: '#16a085', pattern: 'scales', price: 200 },
+    { id: 'tiger', name: 'Tiger Snake', color: '#f39c12', pattern: 'stripes', price: 250 },
+    { id: 'albino', name: 'Albino', color: '#ecf0f1', pattern: 'scales', price: 300 },
+    { id: 'venom', name: 'Venom', color: '#8e44ad', pattern: 'hex', price: 350 },
+    { id: 'lava', name: 'Lava', color: '#c0392b', pattern: 'cracks', price: 400 },
+    { id: 'galaxy', name: 'Galaxy', color: '#2c3e50', pattern: 'stars', price: 500 },
+    { id: 'rainbow', name: 'Rainbow', color: 'rainbow', pattern: 'rainbow', price: 600 }
 ];
 
 // Game Canvas
@@ -618,10 +624,9 @@ function checkCollisions() {
             pellets.splice(i, 1);
             player.length += 1;
 
-            // Level up every 20 pellets
-            if (player.length % 20 === 0) {
+            // Each pellet gives XP and levels up every 10 pellets
+            if (player.length % 10 === 0) {
                 player.level++;
-                updateUI();
             }
             updateUI();
         }
@@ -753,60 +758,123 @@ function drawGrid() {
 function drawSnake(snake, isPlayer) {
     const skin = skins.find(s => s.id === snake.skin) || skins[0];
 
-    // Draw body
+    // Draw body with patterns
     for (let i = snake.segments.length - 1; i >= 0; i--) {
         const segment = snake.segments[i];
         const screenX = segment.x - camera.x;
         const screenY = segment.y - camera.y;
 
         if (screenX > -50 && screenX < gameWidth + 50 && screenY > -50 && screenY < gameHeight + 50) {
-            // Body color
-            if (skin.color === 'linear') {
-                const gradient = ctx.createLinearGradient(screenX - 10, screenY - 10, screenX + 10, screenY + 10);
-                gradient.addColorStop(0, '#e74c3c');
-                gradient.addColorStop(0.2, '#f39c12');
-                gradient.addColorStop(0.4, '#f1c40f');
-                gradient.addColorStop(0.6, '#2ecc71');
-                gradient.addColorStop(0.8, '#3498db');
-                gradient.addColorStop(1, '#9b59b6');
-                ctx.fillStyle = gradient;
-            } else {
-                ctx.fillStyle = skin.color;
+            // Get base color
+            let baseColor = skin.color;
+            if (skin.color === 'rainbow') {
+                const hue = (i * 30) % 360;
+                baseColor = `hsl(${hue}, 70%, 50%)`;
             }
 
+            // Draw main body
+            ctx.fillStyle = baseColor;
             ctx.beginPath();
             ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Outline
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.lineWidth = 2;
+            // Draw pattern overlay
+            drawSnakePattern(skin.pattern, screenX, screenY, segment.radius, baseColor, i);
+
+            // Draw belly (lighter underside)
+            const bellyGradient = ctx.createRadialGradient(screenX, screenY + 2, 0, screenX, screenY, segment.radius);
+            bellyGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            bellyGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.1)');
+            bellyGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = bellyGradient;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Outline for definition
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, segment.radius, 0, Math.PI * 2);
             ctx.stroke();
         }
     }
 
-    // Draw head with eyes
+    // Draw head with eyes and details
     if (snake.segments.length > 0) {
         const head = snake.segments[0];
         const screenX = head.x - camera.x;
         const screenY = head.y - camera.y;
 
-        // Eyes
-        ctx.fillStyle = 'white';
+        // Draw tongue
+        const angle = Math.atan2(snake.targetY - head.y, snake.targetX - head.x);
+        const tongueLength = 12;
+        const tongueX = screenX + Math.cos(angle) * head.radius;
+        const tongueY = screenY + Math.sin(angle) * head.radius;
+
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(screenX - 3, screenY - 3, 3, 0, Math.PI * 2);
+        ctx.moveTo(tongueX, tongueY);
+        const forkOffset = 3;
+        ctx.lineTo(tongueX + Math.cos(angle) * tongueLength, tongueY + Math.sin(angle) * tongueLength);
+        ctx.stroke();
+
+        // Fork of tongue
+        ctx.lineWidth = 1.5;
+        const forkAngle1 = angle - 0.3;
+        const forkAngle2 = angle + 0.3;
+        const forkX = tongueX + Math.cos(angle) * tongueLength;
+        const forkY = tongueY + Math.sin(angle) * tongueLength;
+
+        ctx.beginPath();
+        ctx.moveTo(forkX, forkY);
+        ctx.lineTo(forkX + Math.cos(forkAngle1) * forkOffset, forkY + Math.sin(forkAngle1) * forkOffset);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(forkX, forkY);
+        ctx.lineTo(forkX + Math.cos(forkAngle2) * forkOffset, forkY + Math.sin(forkAngle2) * forkOffset);
+        ctx.stroke();
+
+        // Eyes with slit pupils (snake-like)
+        const eyeAngle = angle + Math.PI / 2;
+        const eyeDistance = 4;
+        const eye1X = screenX + Math.cos(eyeAngle) * eyeDistance;
+        const eye1Y = screenY + Math.sin(eyeAngle) * eyeDistance;
+        const eye2X = screenX - Math.cos(eyeAngle) * eyeDistance;
+        const eye2Y = screenY - Math.sin(eyeAngle) * eyeDistance;
+
+        // Eye whites
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(screenX + 3, screenY - 3, 3, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, 4, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = 'black';
+        // Slit pupils
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(screenX - 3, screenY - 3, 1.5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(eye1X, eye1Y - 3);
+        ctx.lineTo(eye1X, eye1Y + 3);
+        ctx.stroke();
         ctx.beginPath();
-        ctx.arc(screenX + 3, screenY - 3, 1.5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(eye2X, eye2Y - 3);
+        ctx.lineTo(eye2X, eye2Y + 3);
+        ctx.stroke();
+
+        // Eye outline
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(eye2X, eye2Y, 4, 0, Math.PI * 2);
+        ctx.stroke();
 
         // Draw level indicator
         if (isPlayer) {
@@ -815,15 +883,152 @@ function drawSnake(snake, isPlayer) {
             ctx.lineWidth = 3;
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
-            ctx.strokeText(`Lv.${snake.level}`, screenX, screenY - head.radius - 10);
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 10);
+            ctx.strokeText(`Lv.${snake.level}`, screenX, screenY - head.radius - 15);
+            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 15);
         } else {
             ctx.fillStyle = snake.level > player.level ? '#e74c3c' : '#95a5a6';
             ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 8);
+            ctx.fillText(`Lv.${snake.level}`, screenX, screenY - head.radius - 12);
         }
     }
+}
+
+function drawSnakePattern(pattern, x, y, radius, baseColor, segmentIndex) {
+    ctx.save();
+
+    switch (pattern) {
+        case 'scales':
+            // Hexagonal scales
+            for (let row = -1; row <= 1; row++) {
+                for (let col = -1; col <= 1; col++) {
+                    const scaleX = x + col * 6;
+                    const scaleY = y + row * 6 + (col % 2) * 3;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.arc(scaleX, scaleY, 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+            break;
+
+        case 'diamond':
+            // Diamond pattern
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            if (segmentIndex % 3 === 0) {
+                ctx.beginPath();
+                ctx.moveTo(x, y - radius * 0.6);
+                ctx.lineTo(x + radius * 0.4, y);
+                ctx.lineTo(x, y + radius * 0.6);
+                ctx.lineTo(x - radius * 0.4, y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            break;
+
+        case 'bands':
+            // Horizontal bands
+            if (segmentIndex % 4 === 0 || segmentIndex % 4 === 1) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (segmentIndex % 12 === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+
+        case 'spots':
+            // Spotted pattern
+            if (segmentIndex % 2 === 0) {
+                const spots = 3;
+                for (let i = 0; i < spots; i++) {
+                    const angle = (i / spots) * Math.PI * 2;
+                    const spotX = x + Math.cos(angle) * radius * 0.5;
+                    const spotY = y + Math.sin(angle) * radius * 0.5;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(spotX, spotY, radius * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            break;
+
+        case 'gradient':
+            // Gradient overlay
+            const gradient = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+        case 'stripes':
+            // Tiger stripes
+            if (segmentIndex % 2 === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(x - radius, y - radius * 0.3, radius * 2, radius * 0.2);
+                ctx.fillRect(x - radius, y + radius * 0.3, radius * 2, radius * 0.2);
+            }
+            break;
+
+        case 'hex':
+            // Hexagonal pattern
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2;
+                const hx = x + Math.cos(angle) * radius * 0.6;
+                const hy = y + Math.sin(angle) * radius * 0.6;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(hx, hy, 2, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            break;
+
+        case 'cracks':
+            // Lava cracks
+            ctx.strokeStyle = 'rgba(255, 150, 0, 0.8)';
+            ctx.lineWidth = 1.5;
+            if (segmentIndex % 3 === 0) {
+                ctx.beginPath();
+                ctx.moveTo(x - radius, y);
+                ctx.lineTo(x + radius, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.stroke();
+            }
+            break;
+
+        case 'stars':
+            // Galaxy stars
+            if (segmentIndex % 4 === 0) {
+                for (let i = 0; i < 3; i++) {
+                    const sx = x + (Math.random() - 0.5) * radius;
+                    const sy = y + (Math.random() - 0.5) * radius;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            break;
+
+        case 'rainbow':
+            // Rainbow already handled in main color
+            break;
+    }
+
+    ctx.restore();
 }
 
 // Save game state
